@@ -3,6 +3,8 @@
 Pixel-Action-RPG im Stil eines Bullet-Hell-Grinders: grinden, leveln, sterben, neu anfangen.
 Der Nutzer vibecodet das Spiel, spricht Deutsch und ist kein Profi-Entwickler. Erklärungen kurz und verständlich halten, Antworten auf Deutsch.
 
+**Hintergrund:** `VERLAUF.md` (in diesem Ordner) erklärt bisherige Entscheidungen, Versionen und offene Punkte. Zu Beginn lesen und bei wichtigen neuen Entscheidungen unten ergänzen.
+
 ## Projekt-Aufbau
 
 Zwei Repos, lokal **nebeneinander** im selben Ordner:
@@ -62,4 +64,5 @@ Der Nutzer testet das Spielgefühl selbst. Balance-Werte immer an einer Stelle b
   `$env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User')`
 - Windows PowerShell 5.1 zerlegt Argumente mit `"` falsch: Commit-Nachrichten mit Anführungszeichen über eine Datei übergeben (`git commit -F datei.txt`).
 - `.ps1`-Dateien mit Umlauten als UTF-8 **mit BOM** speichern, sonst zeigt PowerShell 5.1 Umlaute falsch.
-- Commits mit der GitHub-noreply-Adresse des Nutzers (lokale `git config` ist gesetzt), nie mit einer privaten E-Mail.
+- Commits mit der GitHub-noreply-Adresse des Nutzers, nie mit einer privaten E-Mail. Vor dem ersten Commit `git config --local user.email` prüfen. Ist nichts gesetzt (z. B. auf einem anderen PC), in **beiden** Ordnern (`Soulgrind-Game` und `Soulgrind`) selbst einrichten:
+  `git config --local user.name lysoqa` und `git config --local user.email 339582153+lysoqa@users.noreply.github.com`
