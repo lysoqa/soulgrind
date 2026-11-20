@@ -1,5 +1,5 @@
 // Spielschleife, Kamera, Effekte und Spielzustände (Auswahl, Spielen, Tod)
-const GAME_VERSION = '0.3.0';
+const GAME_VERSION = '0.4.0';
 const W = 384;
 const H = 216;
 const WORLD = 1600;
@@ -18,7 +18,14 @@ addEventListener('resize', fit);
 fit();
 
 const game = {
-  state: 'select', // select (Klasse) | ability (Fähigkeit) | play | dead
+  state: 'select', // select (Klasse) | ability (Fähigkeit) | play | cleared (Ebene geschafft) | dead
+  stage: 0, // Index in STAGES
+  phase: 'waves', // waves (Gegnerwellen) | clear (Rest besiegen) | boss (Ebenen-Boss)
+  stageBoss: null,
+  pillars: [],
+  pillarT: 0,
+  clearT: 0,
+  autoFire: loadAutoFire(),
   pickedClass: null,
   hoverAbility: -1,
   paused: false,
@@ -52,27 +59,64 @@ const game = {
   start(classId, abilityIndex) {
     const cls = CLASSES[classId];
     this.player = new Player(cls, cls.abilities[abilityIndex], WORLD / 2, WORLD / 2);
-    this.enemies = [];
-    this.projectiles = [];
     this.particles = [];
     this.texts = [];
     this.rings = [];
-    this.runTime = 0;
-    this.spawnT = 1;
-    this.nextBoss = BOSS_INTERVAL;
     this.bossCount = 0;
     this.bossKills = 0;
     this.levelBanner = 0;
     this.paused = false;
     this.choice = null;
     this.pendingChoices = 0;
-    this.cam.x = this.player.x - W / 2;
-    this.cam.y = this.player.y - H / 2;
+    this.enterStage(0);
+  },
+
+  // Ebene beginnen: Timer, Gegner und Säulen fangen von vorne an, der Held bleibt
+  enterStage(index) {
+    this.stage = index;
+    this.phase = 'waves';
+    this.stageBoss = null;
+    this.enemies = [];
+    this.projectiles = [];
+    this.particles = [];
+    this.texts = [];
+    this.rings = [];
+    this.pillars = [];
+    this.pillarT = 3;
+    this.runTime = 0;
+    this.spawnT = 1;
+    this.nextBoss = BOSS_INTERVAL;
+    const p = this.player;
+    p.x = WORLD / 2;
+    p.y = WORLD / 2;
+    p.hp = p.maxHp;
+    this.cam.x = p.x - W / 2;
+    this.cam.y = p.y - H / 2;
     for (let i = 0; i < 4; i++) spawnEnemy(this);
     this.state = 'play';
   },
 
+  get stageDef() { return STAGES[this.stage]; },
   get minutes() { return this.runTime / 60; },
+
+  // Volghard besiegt: übrige Pflanzen verwelken, Bildschirm „Ebene geschafft“
+  stageCleared() {
+    for (const e of this.enemies) {
+      if (e.dead) continue;
+      e.dead = true;
+      this.fx.burst(e.x, e.y, e.type.blood, 10);
+    }
+    this.projectiles = [];
+    this.state = 'cleared';
+    this.clearT = 0;
+    this.lastClear = { stage: this.stage + 1, name: this.stageDef.name, boss: this.stageBoss.type.name, time: this.runTime };
+  },
+
+  toggleAutoFire() {
+    this.autoFire = !this.autoFire;
+    try { localStorage.setItem('soulgrind.autoFire', this.autoFire ? '1' : '0'); } catch (e) { /* egal */ }
+    this.fx.text(this.player.x, this.player.y - 16, this.autoFire ? 'Auto-Schuss an' : 'Auto-Schuss aus', this.autoFire ? '#7fe07f' : '#b9b4a6');
+  },
 
   mouseWorld() {
     return { x: this.cam.x + Input.mouse.x, y: this.cam.y + Input.mouse.y };
@@ -82,7 +126,7 @@ const game = {
     if (e.dead) return;
     e.hp -= dmg;
     e.flash = 0.08;
-    const kb = e.boss ? knockback * 0.2 : knockback;
+    const kb = e.type.anchored ? 0 : e.boss ? knockback * 0.2 : knockback;
     e.x += Math.cos(angle) * kb;
     e.y += Math.sin(angle) * kb;
     this.fx.text(e.x, e.y - 10 * e.scale, dmg, '#f1ede2');
@@ -98,6 +142,7 @@ const game = {
       this.fx.burst(e.x, e.y, e.type.blood, e.boss ? 40 : 12);
       this.fx.text(e.x, e.y - 4, `+${Math.round(e.xp * (1 + this.player.bonus('xpGain')))} XP`, '#ffd34a');
       this.player.gainXp(e.xp, this);
+      if (e === this.stageBoss) this.stageCleared();
     }
   },
 
@@ -177,7 +222,7 @@ const game = {
     this.state = 'dead';
     this.deadT = 0;
     this.choice = null;
-    this.lastRun = { cls: p.cls.name, level: p.level, kills: p.kills, bosses: this.bossKills, time: this.runTime };
+    this.lastRun = { cls: p.cls.name, level: p.level, kills: p.kills, bosses: this.bossKills, time: this.runTime, stage: this.stage + 1 };
     this.fx.burst(p.x, p.y, '#d93a4a', 30);
   },
 
@@ -225,19 +270,16 @@ const game = {
     if (this.paused) { this.updatePauseMenu(); return; }
 
     if (this.state === 'play') {
-      this.runTime += dt;
+      if (Input.wasPressed('KeyQ')) this.toggleAutoFire();
       this.player.update(dt, this);
+      this.updatePhase(dt);
+    }
 
-      this.spawnT -= dt;
-      if (this.spawnT <= 0) {
-        const lvl = this.player.level;
-        if (this.enemies.length < maxEnemies(lvl, this.minutes)) spawnEnemy(this);
-        this.spawnT = spawnDelay(lvl, this.minutes);
-      }
-      if (this.runTime >= this.nextBoss) {
-        this.bossCount++;
-        spawnBoss(this, this.bossCount);
-        this.nextBoss += BOSS_INTERVAL;
+    if (this.state === 'cleared') {
+      this.clearT += dt;
+      if (this.clearT > 1.2 && Input.leftPressed && STAGES[this.stage + 1]) {
+        Input.mouse.left = false; // der Klick soll nicht gleich angreifen
+        this.enterStage(this.stage + 1);
       }
     }
 
@@ -248,6 +290,11 @@ const game = {
 
     for (const e of this.enemies) if (!e.dead) e.update(dt, this);
     separateEnemies(this.enemies);
+    updatePillars(dt, this);
+    if (this.player) {
+      for (const e of this.enemies) if (!e.dead) blockByPillars(e, this, e.speed * dt);
+      blockByPillars(this.player, this);
+    }
     updateProjectiles(dt, this);
     const p = this.player;
     this.enemies = this.enemies.filter((e) => !e.dead && (e.boss || Math.hypot(e.x - p.x, e.y - p.y) < 450));
@@ -272,6 +319,35 @@ const game = {
     this.cam.y += (p.y - H / 2 - this.cam.y) * Math.min(1, dt * 8);
   },
 
+  // Ablauf einer Ebene: Wellen bis zum Zeitlimit, dann Rest besiegen, dann Ebenen-Boss
+  updatePhase(dt) {
+    const st = this.stageDef;
+    if (this.phase === 'waves') {
+      this.runTime += dt;
+      if (st.duration && this.runTime >= st.duration) {
+        this.runTime = st.duration; // Timer bleibt stehen
+        this.phase = 'clear';
+        return;
+      }
+      this.spawnT -= dt;
+      if (this.spawnT <= 0) {
+        const lvl = this.player.level;
+        if (this.enemies.length < maxEnemies(lvl, this.minutes)) spawnEnemy(this);
+        this.spawnT = spawnDelay(lvl, this.minutes);
+      }
+      if (this.runTime >= this.nextBoss) {
+        this.bossCount++;
+        spawnBoss(this, this.bossCount);
+        this.nextBoss += BOSS_INTERVAL;
+      }
+    } else if (this.phase === 'clear') {
+      if (!this.enemies.some((e) => !e.dead)) {
+        this.phase = 'boss';
+        spawnStageBoss(this);
+      }
+    }
+  },
+
   draw() {
     if (this.state === 'select' || this.state === 'ability') {
       if (this.state === 'select') drawSelect(ctx, this);
@@ -283,9 +359,12 @@ const game = {
       x: Math.round(this.cam.x + (Math.random() - 0.5) * this.shake),
       y: Math.round(this.cam.y + (Math.random() - 0.5) * this.shake),
     };
-    drawGround(ctx, cam);
+    if (this.stageDef.ground === 'stone') drawStoneGround(ctx, cam);
+    else drawGround(ctx, cam);
+    drawPillarZones(ctx, cam, this);
 
-    const actors = this.state === 'dead' ? [...this.enemies] : [...this.enemies, this.player];
+    const actors = [...this.enemies, ...this.pillars];
+    if (this.state !== 'dead') actors.push(this.player);
     actors.sort((a, b) => a.y - b.y);
     for (const a of actors) a.draw(ctx, cam, this);
 
@@ -321,6 +400,8 @@ const game = {
       drawHUD(ctx, this);
       if (this.choice) drawChoice(ctx, this);
       else if (this.paused) drawPause(ctx, this);
+    } else if (this.state === 'cleared') {
+      drawStageClear(ctx, this);
     } else {
       drawDead(ctx, this);
     }
@@ -330,7 +411,13 @@ const game = {
 
 const inRect = (m, r) => m.x >= r.x && m.x < r.x + r.w && m.y >= r.y && m.y < r.y + r.h;
 
-// Gegner schieben sich leicht auseinander, damit sie nicht übereinander stehen
+// Auto-Schuss (Q) bleibt über Runs hinweg gespeichert
+function loadAutoFire() {
+  try { return localStorage.getItem('soulgrind.autoFire') === '1'; } catch (e) { return false; }
+}
+
+// Gegner schieben sich leicht auseinander, damit sie nicht übereinander stehen.
+// Feststehende Gegner (Pflanzen) bewegen sich dabei nicht.
 function separateEnemies(enemies) {
   for (let i = 0; i < enemies.length; i++) {
     const a = enemies[i];
@@ -341,11 +428,13 @@ function separateEnemies(enemies) {
       const d = Math.hypot(dx, dy);
       const min = a.r + b.r;
       if (d > 0 && d < min) {
-        const push = (min - d) / 2;
-        a.x -= (dx / d) * push;
-        a.y -= (dy / d) * push;
-        b.x += (dx / d) * push;
-        b.y += (dy / d) * push;
+        const fa = a.type.anchored ? 0 : b.type.anchored ? 1 : 0.5;
+        const fb = b.type.anchored ? 0 : a.type.anchored ? 1 : 0.5;
+        const push = min - d;
+        a.x -= (dx / d) * push * fa;
+        a.y -= (dy / d) * push * fa;
+        b.x += (dx / d) * push * fb;
+        b.y += (dy / d) * push * fb;
       }
     }
   }

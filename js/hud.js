@@ -39,7 +39,26 @@ function drawHUD(ctx, game) {
   // Oben: Klasse, Kills, Rundenzeit
   Font.draw(ctx, p.cls.name, 6, 6, { color: '#f1ede2' });
   Font.draw(ctx, `Kills ${p.kills}`, 6, 14, { color: '#b9b4a6' });
-  Font.draw(ctx, fmtTime(game.runTime), W / 2, 5, { align: 'center', scale: 2 });
+  const frozen = game.phase !== 'waves';
+  Font.draw(ctx, fmtTime(game.runTime), W / 2, 5, { align: 'center', scale: 2, color: frozen ? '#ffd34a' : '#f1ede2' });
+  Font.draw(ctx, `Ebene ${game.stage + 1} · ${game.stageDef.name}`, W - 6, 6, { align: 'right', color: '#b9b4a6' });
+
+  if (game.phase === 'clear') {
+    const left = game.enemies.filter((e) => !e.dead).length;
+    const blink = Math.floor(game.time * 2) % 2 === 0;
+    Font.draw(ctx, `Besiege alle Gegner · ${left} übrig`, W / 2, 20, { align: 'center', color: blink ? '#ffd34a' : '#e0b030' });
+  }
+
+  // Lebensleiste des Ebenen-Bosses
+  const boss = game.stageBoss;
+  if (game.phase === 'boss' && boss && !boss.dead) {
+    const bw = 180;
+    const bx = Math.round((W - bw) / 2);
+    Font.draw(ctx, boss.type.name, W / 2, 20, { align: 'center', scale: 2, color: '#9be05a', shadow: '#1a3010' });
+    drawBar(ctx, bx, 33, bw, 5, boss.hp / boss.maxHp, '#4f9a3a');
+  }
+
+  if (game.autoFire) Font.draw(ctx, 'Auto (Q)', x - 5, H - 27, { align: 'right', color: '#7fe07f' });
 
   // Gewählte Stats links
   Object.entries(p.stats).forEach(([id, rank], i) => {
@@ -189,7 +208,7 @@ function drawSelect(ctx, game) {
     Font.draw(ctx, i + 1, r.x + r.w - 6, y + r.h - 9, { align: 'right', color: '#5d5868', shadow: null });
   });
 
-  const hint = game.hoverCard >= 0 ? CLASSES[CLASS_ORDER[game.hoverCard]].hint : 'WASD laufen · Maus zielen · Linksklick angreifen';
+  const hint = game.hoverCard >= 0 ? CLASSES[CLASS_ORDER[game.hoverCard]].hint : 'WASD laufen · Maus zielen · Linksklick angreifen · Q Auto-Schuss';
   Font.draw(ctx, hint, W / 2, 186, { align: 'center', color: '#b9b4a6' });
   Font.draw(ctx, 'Klicken oder 1 / 2 / 3 drücken', W / 2, 198, { align: 'center', color: '#5d5868', shadow: null });
   Font.draw(ctx, `v${GAME_VERSION}`, W - 4, H - 8, { align: 'right', color: '#3a3046', shadow: null });
@@ -259,12 +278,30 @@ function drawDead(ctx, game) {
   ctx.fillRect(0, 0, W, H);
   const s = game.lastRun;
   Font.draw(ctx, 'Du bist gefallen', W / 2, 46, { align: 'center', scale: 3, color: '#ff5a5a', shadow: '#3a0a10' });
-  Font.draw(ctx, `${s.cls} · Level ${s.level}`, W / 2, 78, { align: 'center', scale: 2 });
+  Font.draw(ctx, `${s.cls} · Level ${s.level} · Ebene ${s.stage}`, W / 2, 78, { align: 'center', scale: 2 });
   Font.draw(ctx, `Überlebt ${fmtTime(s.time)}`, W / 2, 96, { align: 'center', color: '#f1ede2' });
   Font.draw(ctx, `Kills ${s.kills} · Bosse ${s.bosses}`, W / 2, 106, { align: 'center', color: '#b9b4a6' });
   Font.draw(ctx, 'Dein Held ist für immer verloren.', W / 2, 126, { align: 'center', color: '#8b8a95' });
   if (game.deadT > 1.2 && Math.floor(game.time * 2) % 2 === 0) {
     Font.draw(ctx, 'Klicken für einen neuen Helden', W / 2, 156, { align: 'center', color: '#ffd34a' });
+  }
+}
+
+function drawStageClear(ctx, game) {
+  const s = game.lastClear;
+  const p = game.player;
+  const next = STAGES[game.stage + 1];
+  ctx.fillStyle = 'rgba(8,14,8,0.72)';
+  ctx.fillRect(0, 0, W, H);
+  Font.draw(ctx, `Ebene ${s.stage} geschafft!`, W / 2, 40, { align: 'center', scale: 3, color: '#9be05a', shadow: '#1a3010' });
+  Font.draw(ctx, `${s.boss} ist besiegt.`, W / 2, 70, { align: 'center', scale: 2 });
+  Font.draw(ctx, `${p.cls.name} · Level ${p.level} · Kills ${p.kills}`, W / 2, 92, { align: 'center', color: '#b9b4a6' });
+  if (next) {
+    Font.draw(ctx, `Als Nächstes: Ebene ${s.stage + 1} · ${next.name}`, W / 2, 116, { align: 'center', color: '#f1ede2' });
+    Font.draw(ctx, 'Dein Leben wird aufgefüllt.', W / 2, 126, { align: 'center', color: '#8b8a95' });
+    if (game.clearT > 1.2 && Math.floor(game.time * 2) % 2 === 0) {
+      Font.draw(ctx, 'Klicken zum Weitergehen', W / 2, 156, { align: 'center', color: '#ffd34a' });
+    }
   }
 }
 

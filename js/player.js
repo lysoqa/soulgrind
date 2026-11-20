@@ -83,7 +83,7 @@ class Player {
       if (Math.random() < 0.8) game.fx.particle(this.x, this.y + 3, '#62a050', 0.3, 10);
       if (this.dash.t <= 0) this.dash = null;
     } else if (len) {
-      const speed = this.speed * (this.blockT > 0 ? this.ability.slow : 1);
+      const speed = this.speed * (this.blockT > 0 ? this.ability.slow : 1) * pillarSlow(game, this.x, this.y);
       this.x += this.moveDir.x * speed * dt;
       this.y += this.moveDir.y * speed * dt;
       this.walkT += dt;
@@ -108,7 +108,8 @@ class Player {
       this.abilityCd = this.ability.cooldown;
     }
 
-    if (Input.mouse.left && this.cd <= 0 && this.blockT <= 0 && !this.spin) {
+    // Linksklick gedrückt halten oder Auto-Schuss (Q) an
+    if ((Input.mouse.left || game.autoFire) && this.cd <= 0 && this.blockT <= 0 && !this.spin) {
       this.attack(game);
       this.cd = this.cooldown;
     }

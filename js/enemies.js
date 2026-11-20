@@ -68,6 +68,7 @@ class Enemy {
     this.beamDmg = t.beam ? t.beam.dmg * dmgMul : 0;
     this.beamCd = 1.5 + Math.random() * 1.5;
     this.beamState = null; // null | 'charge' | 'fire'
+    this.windupT = 0; // nur Volghard: Warnzittern vor einer Dornensalve
     this.beamT = 0;
     this.beamAngle = 0;
     this.beamHit = false;
@@ -122,13 +123,16 @@ class Enemy {
           this.beamAngle = Math.atan2(dy, dx); // Richtung wird festgelegt, danach kann man ausweichen
         }
       }
+    } else if (t.tree) {
+      const m = updateVolghard(this, dt, game, ux, uy);
+      mx = m.x; my = m.y;
     } else if (t.ranged) {
       if (d > t.ranged.dist + 15) { mx = ux; my = uy; }
       else if (d < t.ranged.dist - 15) { mx = -ux; my = -uy; }
       else { mx = -uy * this.strafe * 0.7; my = ux * this.strafe * 0.7; }
       if (Math.random() < dt * 0.3) this.strafe *= -1;
       this.fireT -= dt;
-      if (this.fireT <= 0 && d < 180) {
+      if (this.fireT <= 0 && d < (t.ranged.range || 180)) {
         this.shoot(game, Math.atan2(dy, dx));
         this.fireT = t.ranged.cd * (0.8 + Math.random() * 0.4) * (this.boss ? 0.7 : 1);
       }
@@ -151,8 +155,13 @@ class Enemy {
     const minDist = this.r + p.r;
     const touching = d < minDist + 1;
     if (d < minDist) {
-      this.x = p.x - (dx / d) * minDist;
-      this.y = p.y - (dy / d) * minDist;
+      if (t.anchored) { // feststehende Gegner (Pflanzen) schieben stattdessen den Helden weg
+        p.x = this.x + (dx / d) * minDist;
+        p.y = this.y + (dy / d) * minDist;
+      } else {
+        this.x = p.x - (dx / d) * minDist;
+        this.y = p.y - (dy / d) * minDist;
+      }
     }
 
     if (t.contact && touching && this.contactT <= 0 && this.stunT <= 0) {
@@ -166,13 +175,14 @@ class Enemy {
   }
 
   shoot(game, angle) {
-    let shots = this.level >= 6 ? 3 : 1; // ab Level 6 schießen Skelette 3 Kugeln
+    const r = this.type.ranged;
+    let shots = r.shots || (this.level >= 6 ? 3 : 1); // ab Level 6 schießen Skelette 3 Kugeln
     if (this.boss) shots += 2;
-    const sp = this.type.ranged.speed * (1 + 0.02 * (this.level - 1));
+    const sp = r.speed * (1 + 0.02 * (this.level - 1));
     for (let i = 0; i < shots; i++) {
       const a = angle + (i - (shots - 1) / 2) * 0.25;
       game.projectiles.push({
-        friendly: false, kind: 'bullet', x: this.x, y: this.y,
+        friendly: false, kind: r.kind || 'bullet', x: this.x, y: this.y,
         vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 200 / sp, r: this.boss ? 3 : 2, dmg: this.bulletDmg,
       });
     }
@@ -186,8 +196,9 @@ class Enemy {
     const hover = this.type.zigzag ? -3 * this.scale : 0;
     const half = Math.round(spr.h * this.scale / 2);
 
+    const shadow = Math.round(this.r * 1.8);
     ctx.fillStyle = 'rgba(0,0,0,0.3)';
-    ctx.fillRect(sx - 4 * this.scale, sy + half - 1, 9 * this.scale, 2 * this.scale);
+    ctx.fillRect(sx - Math.floor(shadow / 2), sy + half - 1, shadow, 2 * this.scale);
     if (this.beamState) {
       const b = this.type.beam;
       const len = b.length * this.scale;
@@ -210,7 +221,9 @@ class Enemy {
         ctx.stroke();
       }
     }
-    drawSprite(ctx, spr, sx, sy + hover, { flip: this.facing < 0, white: this.flash > 0, scale: this.scale });
+    // Volghard zittert kurz, bevor er Dornen schießt
+    const shakeX = this.windupT > 0 ? Math.round(Math.sin(game.time * 60)) : 0;
+    drawSprite(ctx, spr, sx + shakeX, sy + hover, { flip: this.facing < 0, white: this.flash > 0, scale: this.scale });
 
     // Betäubung: kreisende Sterne über dem Kopf
     if (this.stunT > 0) {
@@ -221,7 +234,7 @@ class Enemy {
       }
     }
 
-    if (this.hp < this.maxHp) {
+    if (this.hp < this.maxHp && !this.bossBar) {
       const w = 12 * this.scale;
       const y = sy + hover - half - 4;
       ctx.fillStyle = '#1a1420';
@@ -232,8 +245,8 @@ class Enemy {
   }
 }
 
-// Wählt einen Gegnertyp passend zum Level
-function pickEnemyType(level) {
+// Wählt einen Gegnertyp passend zum Level (die Ebene kann Typen austauschen, z. B. Zombie > Troll)
+function pickEnemyType(level, stage) {
   const weights = {
     zombie: 45,
     bat: 30 + level,
@@ -242,10 +255,11 @@ function pickEnemyType(level) {
   };
   const total = Object.values(weights).reduce((a, b) => a + b, 0);
   let r = Math.random() * total;
+  let pick = 'zombie';
   for (const [id, w] of Object.entries(weights)) {
-    if ((r -= w) < 0) return id;
+    if ((r -= w) < 0) { pick = id; break; }
   }
-  return 'zombie';
+  return stage.replace[pick] || pick;
 }
 
 function spawnPoint(game) {
@@ -260,20 +274,22 @@ function spawnPoint(game) {
   return null;
 }
 
-// Gegnerlevel: Level des Helden plus 1 pro überlebter Minute
-const enemyLevel = (game) => game.player.level + Math.floor(game.runTime / 60);
+// Gegnerlevel: Level des Helden plus 1 pro überlebter Minute (Timer startet jede Ebene neu) plus Ebenen-Bonus
+const enemyLevel = (game) => game.player.level + Math.floor(game.runTime / 60) + game.stageDef.levelBonus;
 
 function spawnEnemy(game) {
   const pt = spawnPoint(game);
   if (!pt) return;
   const lvl = enemyLevel(game);
-  game.enemies.push(new Enemy(pickEnemyType(lvl), lvl, pt.x, pt.y));
+  game.enemies.push(new Enemy(pickEnemyType(lvl, game.stageDef), lvl, pt.x, pt.y));
 }
 
 function spawnBoss(game, index) {
   const pt = spawnPoint(game);
   if (!pt) return;
-  const types = Object.keys(ENEMY_TYPES);
+  // Mini-Boss aus den normalen Gegnern dieser Ebene (mit Austausch, z. B. Troll statt Zombie)
+  const st = game.stageDef;
+  const types = [...new Set(Object.keys(ENEMY_TYPES).filter((id) => !ENEMY_TYPES[id].special && id !== 'troll').map((id) => st.replace[id] || id))];
   const lvl = enemyLevel(game);
   game.enemies.push(new Enemy(types[Math.floor(Math.random() * types.length)], lvl, pt.x, pt.y, index));
 }

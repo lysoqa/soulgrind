@@ -38,7 +38,16 @@ Neue wichtige Entscheidungen bitte unten ergänzen.
   - Neuer seltener Gegner Echse: bleibt stehen, rote Warnlinie, dann ausweichbarer Strahl.
   - ESC-Menü: Weiter / Run abbrechen.
 
+- **v0.4.0 (21.11.2026), Ebenen und Auto-Schuss:**
+  - **Auto-Schuss:** Q schaltet ihn an/aus, für alle Klassen, gezielt wird weiter mit der Maus. Die Einstellung bleibt gespeichert.
+  - **Ebene 1 (Wald)** dauert 10 Minuten. Bei 10:00 bleibt der Timer stehen, es kommen keine neuen Gegner mehr. Erst wenn alle übrigen Gegner tot sind, erscheint der Boss **Volghard** etwas entfernt vom Helden, mit Name und Lebensleiste.
+  - **Volghard:** Naturbaum, langsam, schießt Dornen (abwechselnd rundum und als gezielter Fächer, mit kurzem Zittern als Warnung) und lässt wenige Dornenpflanzen wachsen (höchstens 3). Pflanzen stehen fest, schießen und lassen sich zerstören. Ein zusätzlicher „Sofort-töten-Ansturm“ stand nur versehentlich in der Idee und wird **nicht** gebaut.
+  - Nach dem Sieg erscheint „Ebene geschafft“. Der gleiche Held geht mit Level und Stats in Ebene 2, sein Leben wird aufgefüllt. Timer, Gegnerdichte und Mini-Boss-Takt starten neu, die Gegner sind 2 Level stärker als in Ebene 1 und werden wieder mit der Zeit stärker.
+  - **Ebene 2 (Steinebene):** Steinboden, Trolle statt Zombies. Kleine Steinsäulen wachsen in 3 Stufen aus dem Boden (Spitze, fast oben, oben). Erst wenn sie ganz oben sind, blocken sie Held und Gegner und bremsen den Helden im Umkreis. Sie erscheinen nicht direkt am Helden und versinken nach einer Weile wieder. Gegner rutschen an Säulen vorbei. Ebene 2 läuft vorerst endlos, ein Boss für sie kommt später.
+  - Alle Werte stehen in `js/stages.js`.
+
 ## Offene Punkte und Ideen
+- **Boss für Ebene 2** fehlt noch (der Nutzer liefert die Idee).
 - **Erholung** (+0,1 Leben/s pro Rang, wie vom Nutzer vorgegeben) ist sehr schwach, weil es zusätzlich eine Grund-Regeneration gibt (2 % Leben/s nach 4 s ohne Treffer). Noch nicht entschieden, ob die Grund-Regeneration wegfällt oder Erholung stärker wird.
 - Als Nächstes vorgeschlagen: ein paar Runden spielen und Balance notieren, dann **Prestige-Punkte**, danach **Loot**.
 - Mögliche Launcher-Erweiterung: Selbst-Update des Launchers.

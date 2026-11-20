@@ -55,6 +55,15 @@ function drawProjectiles(ctx, cam, game) {
     const sy = Math.round(p.y - cam.y);
     if (p.kind === 'arrow') {
       drawRotated(ctx, SPR.arrow, sx, sy, Math.atan2(p.vy, p.vx), -4);
+    } else if (p.kind === 'thorn') {
+      drawRotated(ctx, SPR.thorn, sx, sy, Math.atan2(p.vy, p.vx), -3);
+    } else if (p.kind === 'seed') {
+      ctx.fillStyle = '#1a1420';
+      ctx.fillRect(sx - 2, sy - 2, 5, 5);
+      ctx.fillStyle = '#9be05a';
+      ctx.fillRect(sx - 1, sy - 1, 3, 3);
+      ctx.fillStyle = '#e8ffc2';
+      ctx.fillRect(sx, sy - 1, 1, 1);
     } else if (p.kind === 'orb') {
       ctx.fillStyle = 'rgba(176,124,255,0.5)';
       ctx.fillRect(sx - 3, sy - 3, 7, 7);
