@@ -12,6 +12,9 @@ Set-Location $PSScriptRoot
 $Version = $Version.TrimStart('v')
 if ($Version -notmatch '^\d+\.\d+\.\d+$') { throw 'Version bitte als 1.2.3 angeben.' }
 if (git status --porcelain) { throw 'Es gibt noch nicht committete Änderungen. Bitte erst committen.' }
+if (-not (Select-String -Path js/main.js -SimpleMatch "GAME_VERSION = '$Version'" -Quiet)) {
+  throw "In js/main.js steht eine andere GAME_VERSION. Bitte auf '$Version' setzen und committen."
+}
 
 # Zip mit "/" als Trenner bauen (Compress-Archive in Windows PowerShell nutzt "\", das mögen andere Programme nicht)
 Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem

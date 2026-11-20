@@ -1,34 +1,41 @@
-// Gegnertypen. hp/contact/xp sind Werte auf Level 1 und wachsen mit dem Level des Spielers.
+// Gegnertypen. hp/contact/xp sind Werte auf Gegnerlevel 1 und wachsen mit dem Gegnerlevel.
 const ENEMY_TYPES = {
   zombie: {
-    name: 'Zombie', sprites: ['zombie'], hp: 50, speed: 20, contact: 12, xp: 10, r: 5, blood: '#4f7a3e',
+    name: 'Zombie', sprites: ['zombie'], hp: 50, speed: 20, contact: 12, xp: 6, r: 5, blood: '#4f7a3e',
   },
   bat: {
-    name: 'Fledermaus', sprites: ['batA', 'batB'], hp: 18, speed: 55, contact: 7, xp: 7, r: 4, blood: '#6b4a8c',
+    name: 'Fledermaus', sprites: ['batA', 'batB'], hp: 18, speed: 55, contact: 7, xp: 4, r: 4, blood: '#6b4a8c',
     zigzag: true,
   },
   skeleton: {
-    name: 'Skelett-Schütze', sprites: ['skeleton'], hp: 35, speed: 26, contact: 0, xp: 14, r: 5, blood: '#e8e4d4',
+    name: 'Skelett-Schütze', sprites: ['skeleton'], hp: 35, speed: 26, contact: 0, xp: 8, r: 5, blood: '#e8e4d4',
     ranged: { dist: 95, cd: 1.9, speed: 85, dmg: 9 },
   },
 };
 
+// Mini-Boss: gleicher Gegnertyp, nur größer und stärker. Jeder weitere Boss wird noch etwas stärker.
+const BOSS = { scale: 2, hp: 12, dmg: 2, xp: 10, speed: 0.8, growthPerBoss: 0.5 };
+
 class Enemy {
-  constructor(typeId, level, x, y) {
+  constructor(typeId, level, x, y, bossIndex = 0) {
     const t = ENEMY_TYPES[typeId];
-    const hpMul = 1 + 0.15 * (level - 1);
-    const dmgMul = 1 + 0.1 * (level - 1);
+    const boss = bossIndex > 0;
+    const bossMul = boss ? 1 + BOSS.growthPerBoss * (bossIndex - 1) : 1;
+    const hpMul = (1 + 0.15 * (level - 1)) * (boss ? BOSS.hp * bossMul : 1);
+    const dmgMul = (1 + 0.1 * (level - 1)) * (boss ? BOSS.dmg * bossMul : 1);
     this.type = t;
+    this.boss = boss;
+    this.scale = boss ? BOSS.scale : 1;
     this.level = level;
     this.x = x;
     this.y = y;
-    this.r = t.r;
+    this.r = t.r * this.scale;
     this.maxHp = Math.round(t.hp * hpMul);
     this.hp = this.maxHp;
-    this.speed = t.speed * (1 + 0.02 * (level - 1)) * (0.9 + Math.random() * 0.2);
+    this.speed = t.speed * (1 + 0.02 * (level - 1)) * (0.9 + Math.random() * 0.2) * (boss ? BOSS.speed : 1);
     this.contact = t.contact * dmgMul;
     this.bulletDmg = t.ranged ? t.ranged.dmg * dmgMul : 0;
-    this.xp = Math.round(t.xp * (1 + 0.1 * (level - 1)));
+    this.xp = Math.round(t.xp * (1 + 0.1 * (level - 1)) * (boss ? BOSS.xp * bossMul : 1));
     this.seed = Math.random() * 100;
     this.fireT = t.ranged ? 1 + Math.random() : 0;
     this.strafe = Math.random() < 0.5 ? 1 : -1;
@@ -41,9 +48,9 @@ class Enemy {
   update(dt, game) {
     const p = game.player;
     const t = this.type;
-    const dx = p.x - this.x;
-    const dy = p.y - this.y;
-    const d = Math.hypot(dx, dy) || 1;
+    let dx = p.x - this.x;
+    let dy = p.y - this.y;
+    let d = Math.hypot(dx, dy) || 1;
     const ux = dx / d;
     const uy = dy / d;
     let mx = ux, my = uy;
@@ -56,7 +63,7 @@ class Enemy {
       this.fireT -= dt;
       if (this.fireT <= 0 && d < 180) {
         this.shoot(game, Math.atan2(dy, dx));
-        this.fireT = t.ranged.cd * (0.8 + Math.random() * 0.4);
+        this.fireT = t.ranged.cd * (0.8 + Math.random() * 0.4) * (this.boss ? 0.7 : 1);
       }
     } else if (t.zigzag) {
       const wave = Math.sin(game.time * 7 + this.seed) * 0.9;
@@ -72,20 +79,36 @@ class Enemy {
     this.contactT -= dt;
     this.flash -= dt;
 
-    if (t.contact && d < this.r + p.r + 1 && this.contactT <= 0) {
+    // Gegner dürfen nicht in den Helden hineinlaufen
+    dx = p.x - this.x;
+    dy = p.y - this.y;
+    d = Math.hypot(dx, dy) || 0.01;
+    const minDist = this.r + p.r;
+    const touching = d < minDist + 1;
+    if (d < minDist) {
+      this.x = p.x - (dx / d) * minDist;
+      this.y = p.y - (dy / d) * minDist;
+    }
+
+    if (t.contact && touching && this.contactT <= 0) {
       p.takeDamage(this.contact, game);
       this.contactT = 0.8;
+      // nach dem Treffer kurz zurückprallen, statt am Helden zu kleben
+      const push = this.boss ? 4 : 12;
+      this.x -= (dx / d) * push;
+      this.y -= (dy / d) * push;
     }
   }
 
   shoot(game, angle) {
-    const shots = this.level >= 6 ? 3 : 1; // ab Level 6 schießen Skelette 3 Kugeln
+    let shots = this.level >= 6 ? 3 : 1; // ab Level 6 schießen Skelette 3 Kugeln
+    if (this.boss) shots += 2;
     const sp = this.type.ranged.speed * (1 + 0.02 * (this.level - 1));
     for (let i = 0; i < shots; i++) {
       const a = angle + (i - (shots - 1) / 2) * 0.25;
       game.projectiles.push({
         friendly: false, kind: 'bullet', x: this.x, y: this.y,
-        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 200 / sp, r: 2, dmg: this.bulletDmg,
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 200 / sp, r: this.boss ? 3 : 2, dmg: this.bulletDmg,
       });
     }
   }
@@ -95,30 +118,32 @@ class Enemy {
     const sy = Math.round(this.y - cam.y);
     const sprites = this.type.sprites;
     const spr = SPR[sprites[Math.floor((game.time + this.seed) * 7) % sprites.length]];
-    const hover = this.type.zigzag ? -3 : 0;
+    const hover = this.type.zigzag ? -3 * this.scale : 0;
+    const half = Math.round(spr.h * this.scale / 2);
 
     ctx.fillStyle = 'rgba(0,0,0,0.3)';
-    ctx.fillRect(sx - 4, sy + 5, 9, 2);
-    drawSprite(ctx, spr, sx, sy + hover, { flip: this.facing < 0, white: this.flash > 0 });
+    ctx.fillRect(sx - 4 * this.scale, sy + half - 1, 9 * this.scale, 2 * this.scale);
+    drawSprite(ctx, spr, sx, sy + hover, { flip: this.facing < 0, white: this.flash > 0, scale: this.scale });
 
     if (this.hp < this.maxHp) {
-      const w = 12;
+      const w = 12 * this.scale;
+      const y = sy + hover - half - 4;
       ctx.fillStyle = '#1a1420';
-      ctx.fillRect(sx - w / 2, sy - 10 + hover, w, 2);
+      ctx.fillRect(sx - w / 2, y, w, 2);
       ctx.fillStyle = '#e04848';
-      ctx.fillRect(sx - w / 2, sy - 10 + hover, Math.max(1, Math.round((w * this.hp) / this.maxHp)), 2);
+      ctx.fillRect(sx - w / 2, y, Math.max(1, Math.round((w * this.hp) / this.maxHp)), 2);
     }
   }
 }
 
-// Wählt einen Gegnertyp passend zum Level des Spielers
+// Wählt einen Gegnertyp passend zum Level
 function pickEnemyType(level) {
   const weights = {
     zombie: 45,
     bat: 30 + level,
     skeleton: level >= 2 ? 15 + level * 2 : 0,
   };
-  let total = Object.values(weights).reduce((a, b) => a + b, 0);
+  const total = Object.values(weights).reduce((a, b) => a + b, 0);
   let r = Math.random() * total;
   for (const [id, w] of Object.entries(weights)) {
     if ((r -= w) < 0) return id;
@@ -126,19 +151,37 @@ function pickEnemyType(level) {
   return 'zombie';
 }
 
-function spawnEnemy(game) {
+function spawnPoint(game) {
   const p = game.player;
   for (let tries = 0; tries < 8; tries++) {
     const a = Math.random() * Math.PI * 2;
     const dist = 220 + Math.random() * 50;
     const x = Math.max(10, Math.min(WORLD - 10, p.x + Math.cos(a) * dist));
     const y = Math.max(10, Math.min(WORLD - 10, p.y + Math.sin(a) * dist));
-    if (Math.hypot(x - p.x, y - p.y) > 150) {
-      game.enemies.push(new Enemy(pickEnemyType(p.level), p.level, x, y));
-      return;
-    }
+    if (Math.hypot(x - p.x, y - p.y) > 150) return { x, y };
   }
+  return null;
 }
 
-const maxEnemies = (level) => Math.min(40, 7 + level * 2);
-const spawnDelay = (level) => Math.max(0.35, 1.3 - level * 0.05);
+// Gegnerlevel: Level des Helden plus 1 pro überlebter Minute
+const enemyLevel = (game) => game.player.level + Math.floor(game.runTime / 60);
+
+function spawnEnemy(game) {
+  const pt = spawnPoint(game);
+  if (!pt) return;
+  const lvl = enemyLevel(game);
+  game.enemies.push(new Enemy(pickEnemyType(lvl), lvl, pt.x, pt.y));
+}
+
+function spawnBoss(game, index) {
+  const pt = spawnPoint(game);
+  if (!pt) return;
+  const types = Object.keys(ENEMY_TYPES);
+  const lvl = enemyLevel(game);
+  game.enemies.push(new Enemy(types[Math.floor(Math.random() * types.length)], lvl, pt.x, pt.y, index));
+}
+
+// Mehr Gegner mit höherem Level und längerer Rundenzeit
+const maxEnemies = (level, minutes) => Math.min(70, 7 + level * 2 + Math.floor(minutes * 4));
+const spawnDelay = (level, minutes) => Math.max(0.15, 1.3 - level * 0.04 - minutes * 0.08);
+const BOSS_INTERVAL = 180; // alle 3 Minuten ein Mini-Boss

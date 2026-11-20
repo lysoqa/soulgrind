@@ -1,4 +1,5 @@
 // Spielschleife, Kamera, Effekte und Spielzustände (Auswahl, Spielen, Tod)
+const GAME_VERSION = '0.2.0';
 const W = 384;
 const H = 216;
 const WORLD = 1600;
@@ -19,6 +20,8 @@ fit();
 const game = {
   state: 'select', // select | play | dead
   paused: false,
+  choice: null, // offene Stat-Auswahl nach einem Level-Up
+  pendingChoices: 0,
   time: 0,
   runTime: 0,
   cam: { x: 0, y: 0 },
@@ -30,6 +33,9 @@ const game = {
   rings: [],
   shake: 0,
   spawnT: 0,
+  nextBoss: BOSS_INTERVAL,
+  bossCount: 0,
+  bossKills: 0,
   levelBanner: 0,
   deadT: 0,
   hoverCard: -1,
@@ -44,13 +50,20 @@ const game = {
     this.rings = [];
     this.runTime = 0;
     this.spawnT = 1;
+    this.nextBoss = BOSS_INTERVAL;
+    this.bossCount = 0;
+    this.bossKills = 0;
     this.levelBanner = 0;
     this.paused = false;
+    this.choice = null;
+    this.pendingChoices = 0;
     this.cam.x = this.player.x - W / 2;
     this.cam.y = this.player.y - H / 2;
     for (let i = 0; i < 4; i++) spawnEnemy(this);
     this.state = 'play';
   },
+
+  get minutes() { return this.runTime / 60; },
 
   mouseWorld() {
     return { x: this.cam.x + Input.mouse.x, y: this.cam.y + Input.mouse.y };
@@ -60,15 +73,21 @@ const game = {
     if (e.dead) return;
     e.hp -= dmg;
     e.flash = 0.08;
-    e.x += Math.cos(angle) * knockback;
-    e.y += Math.sin(angle) * knockback;
-    this.fx.text(e.x, e.y - 10, dmg, '#f1ede2');
+    const kb = e.boss ? knockback * 0.2 : knockback;
+    e.x += Math.cos(angle) * kb;
+    e.y += Math.sin(angle) * kb;
+    this.fx.text(e.x, e.y - 10 * e.scale, dmg, '#f1ede2');
     this.fx.burst(e.x, e.y, e.type.blood, 3);
     if (e.hp <= 0) {
       e.dead = true;
       this.player.kills++;
-      this.fx.burst(e.x, e.y, e.type.blood, 12);
-      this.fx.text(e.x, e.y - 4, `+${e.xp} XP`, '#ffd34a');
+      if (e.boss) {
+        this.bossKills++;
+        this.shake = 6;
+        this.fx.ring(e.x, e.y, '#ffd34a', 40);
+      }
+      this.fx.burst(e.x, e.y, e.type.blood, e.boss ? 40 : 12);
+      this.fx.text(e.x, e.y - 4, `+${Math.round(e.xp * (1 + this.player.bonus('xpGain')))} XP`, '#ffd34a');
       this.player.gainXp(e.xp, this);
     }
   },
@@ -77,13 +96,55 @@ const game = {
     this.levelBanner = 2;
     this.fx.ring(this.player.x, this.player.y, '#ffd34a', 30);
     this.fx.burst(this.player.x, this.player.y, '#ffd34a', 20);
+    this.pendingChoices++;
+    this.openChoice();
+  },
+
+  // ---------- Stat-Auswahl ----------
+
+  openChoice() {
+    if (this.choice || this.pendingChoices <= 0) return;
+    const options = rollStatOptions(this.player);
+    if (!options.length) { this.pendingChoices = 0; return; } // alles ausgebaut
+    this.choice = { options, openedAt: this.time, hover: -1 };
+  },
+
+  pickStat(i) {
+    const id = this.choice && this.choice.options[i];
+    if (!id) return;
+    this.player.addStat(id);
+    this.fx.text(this.player.x, this.player.y - 16, `${STATS[id].name} ${this.player.rank(id)}`, '#b07cff');
+    this.choice = null;
+    this.pendingChoices--;
+    Input.mouse.left = false; // der Klick soll nicht gleich angreifen
+    this.openChoice();
+  },
+
+  reroll() {
+    if (!this.choice || this.player.rerolls <= 0) return;
+    this.player.rerolls--;
+    this.choice.options = rollStatOptions(this.player, this.choice.options);
+  },
+
+  updateChoice() {
+    const c = this.choice;
+    const ready = this.time - c.openedAt > 0.35; // kurz warten, damit Dauerfeuer nicht sofort etwas auswählt
+    c.hover = choiceRects(c.options.length).findIndex((r) => inRect(Input.mouse, r));
+    const overReroll = inRect(Input.mouse, rerollRect());
+    ['Digit1', 'Digit2', 'Digit3'].forEach((k, i) => { if (ready && Input.wasPressed(k)) this.pickStat(i); });
+    if (Input.wasPressed('KeyR')) this.reroll();
+    if (ready && Input.leftPressed) {
+      if (c.hover >= 0) this.pickStat(c.hover);
+      else if (overReroll) this.reroll();
+    }
   },
 
   die() {
     const p = this.player;
     this.state = 'dead';
     this.deadT = 0;
-    this.lastRun = { cls: p.cls.name, level: p.level, kills: p.kills, time: this.runTime };
+    this.choice = null;
+    this.lastRun = { cls: p.cls.name, level: p.level, kills: p.kills, bosses: this.bossKills, time: this.runTime };
     this.fx.burst(p.x, p.y, '#d93a4a', 30);
   },
 
@@ -108,8 +169,7 @@ const game = {
     this.time += dt;
 
     if (this.state === 'select') {
-      const keys = ['Digit1', 'Digit2', 'Digit3'];
-      keys.forEach((k, i) => { if (Input.wasPressed(k)) this.start(CLASS_ORDER[i]); });
+      ['Digit1', 'Digit2', 'Digit3'].forEach((k, i) => { if (Input.wasPressed(k)) this.start(CLASS_ORDER[i]); });
       if (Input.leftPressed && this.hoverCard >= 0) {
         Input.mouse.left = false; // erster Klick soll nicht gleich angreifen
         this.start(CLASS_ORDER[this.hoverCard]);
@@ -117,6 +177,7 @@ const game = {
       return;
     }
 
+    if (this.state === 'play' && this.choice) { this.updateChoice(); return; }
     if (this.state === 'play' && Input.wasPressed('Escape')) this.paused = !this.paused;
     if (this.paused) return;
 
@@ -126,8 +187,14 @@ const game = {
 
       this.spawnT -= dt;
       if (this.spawnT <= 0) {
-        if (this.enemies.length < maxEnemies(this.player.level)) spawnEnemy(this);
-        this.spawnT = spawnDelay(this.player.level);
+        const lvl = this.player.level;
+        if (this.enemies.length < maxEnemies(lvl, this.minutes)) spawnEnemy(this);
+        this.spawnT = spawnDelay(lvl, this.minutes);
+      }
+      if (this.runTime >= this.nextBoss) {
+        this.bossCount++;
+        spawnBoss(this, this.bossCount);
+        this.nextBoss += BOSS_INTERVAL;
       }
     }
 
@@ -140,7 +207,7 @@ const game = {
     separateEnemies(this.enemies);
     updateProjectiles(dt, this);
     const p = this.player;
-    this.enemies = this.enemies.filter((e) => !e.dead && Math.hypot(e.x - p.x, e.y - p.y) < 450);
+    this.enemies = this.enemies.filter((e) => !e.dead && (e.boss || Math.hypot(e.x - p.x, e.y - p.y) < 450));
 
     for (const pt of this.particles) {
       pt.x += pt.vx * dt;
@@ -208,13 +275,16 @@ const game = {
         ctx.fillRect(0, 0, W, H);
       }
       drawHUD(ctx, this);
-      if (this.paused) drawPause(ctx);
+      if (this.choice) drawChoice(ctx, this);
+      else if (this.paused) drawPause(ctx);
     } else {
       drawDead(ctx, this);
     }
     drawCrosshair(ctx);
   },
 };
+
+const inRect = (m, r) => m.x >= r.x && m.x < r.x + r.w && m.y >= r.y && m.y < r.y + r.h;
 
 // Gegner schieben sich leicht auseinander, damit sie nicht übereinander stehen
 function separateEnemies(enemies) {

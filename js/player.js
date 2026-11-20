@@ -1,5 +1,6 @@
 const MAX_LEVEL = 20;
-const xpForLevel = (level) => Math.round(25 * Math.pow(level, 1.4));
+// Benötigte XP pro Level, steigt mit jedem Level stärker an (L1: 30, L5: 358, L10: 1102, L19: 3170)
+const xpForLevel = (level) => Math.round(20 * Math.pow(level, 1.7) + 10 * level);
 
 function angleDiff(a, b) {
   let d = a - b;
@@ -16,6 +17,8 @@ class Player {
     this.r = 4;
     this.level = 1;
     this.xp = 0;
+    this.stats = {}; // gewählte Stats: id -> Rang
+    this.rerolls = REROLLS_PER_RUN;
     this.maxHp = cls.hp;
     this.hp = this.maxHp;
     this.aim = 0;
@@ -31,7 +34,24 @@ class Player {
     this.kills = 0;
   }
 
-  get dmgMul() { return 1 + this.cls.growth.dmg * (this.level - 1); }
+  rank(id) { return this.stats[id] || 0; }
+  bonus(id) { return this.rank(id) * STATS[id].per; }
+
+  get dmgMul() { return (1 + this.cls.growth.dmg * (this.level - 1)) * (1 + this.bonus('damage')); }
+  get speed() { return this.cls.speed * (1 + this.bonus('moveSpeed')); }
+  get cooldown() { return this.cls.cooldown / (1 + this.bonus('attackSpeed')); }
+  get projSpeed() { return this.cls.projSpeed * (1 + this.bonus('projSpeed')); }
+
+  recalcMaxHp() {
+    const old = this.maxHp;
+    this.maxHp = Math.round((this.cls.hp + this.cls.growth.hp * (this.level - 1)) * (1 + this.bonus('maxHp')));
+    this.hp = Math.min(this.maxHp, this.hp + Math.max(0, this.maxHp - old));
+  }
+
+  addStat(id) {
+    this.stats[id] = this.rank(id) + 1;
+    if (id === 'maxHp') this.recalcMaxHp();
+  }
 
   rollDamage() {
     const [a, b] = this.cls.damage;
@@ -48,7 +68,7 @@ class Player {
     const len = Math.hypot(dx, dy);
     this.moving = len > 0;
     if (len) {
-      const speed = c.speed * (this.blockT > 0 ? c.block.slow : 1);
+      const speed = this.speed * (this.blockT > 0 ? c.block.slow : 1);
       this.x += (dx / len) * speed * dt;
       this.y += (dy / len) * speed * dt;
       this.walkT += dt;
@@ -74,13 +94,14 @@ class Player {
 
     if (Input.mouse.left && this.cd <= 0 && this.blockT <= 0) {
       this.attack(game);
-      this.cd = c.cooldown;
+      this.cd = this.cooldown;
     }
 
     // Langsame Regeneration, wenn man 4 Sekunden keinen Schaden bekommen hat
-    if (game.time - this.lastHit > 4 && this.hp < this.maxHp) {
-      this.hp = Math.min(this.maxHp, this.hp + this.maxHp * 0.02 * dt);
-    }
+    if (game.time - this.lastHit > 4) this.hp += this.maxHp * 0.02 * dt;
+    // Erholung (Stat) wirkt immer
+    this.hp += this.bonus('recovery') * dt;
+    this.hp = Math.min(this.maxHp, this.hp);
   }
 
   attack(game) {
@@ -97,12 +118,13 @@ class Player {
       }
       return;
     }
-    const speed = c.projSpeed;
-    game.projectiles.push({
+    const speed = this.projSpeed;
+    const proj = {
       friendly: true,
       kind: c.attack,
-      x: this.x + Math.cos(a) * 6,
-      y: this.y + Math.sin(a) * 6,
+      // Geschoss startet in der Mitte des Helden, damit es auch Gegner trifft, die direkt auf dir stehen
+      x: this.x,
+      y: this.y,
       vx: Math.cos(a) * speed,
       vy: Math.sin(a) * speed,
       life: c.range / speed,
@@ -113,8 +135,29 @@ class Player {
       aoe: c.aoe || 0,
       aoeFactor: c.aoeFactor || 0,
       knockback: c.knockback,
-    });
+    };
     if (c.attack === 'orb') this.castT = 0.2;
+
+    // Nahschuss: Ein Gegner, der den Helden berührt, wird immer getroffen, egal wohin gezielt wird
+    let touching = null;
+    let best = Infinity;
+    for (const e of game.enemies) {
+      if (e.dead) continue;
+      const d = Math.hypot(e.x - this.x, e.y - this.y);
+      if (d < e.r + this.r + 3 && d < best) { best = d; touching = e; }
+    }
+    if (touching) {
+      if (proj.aoe) {
+        proj.x = touching.x;
+        proj.y = touching.y;
+        explode(proj, game, touching);
+        return;
+      }
+      game.hitEnemy(touching, proj.dmg, Math.atan2(touching.y - this.y, touching.x - this.x), proj.knockback);
+      proj.hit.add(touching);
+      if (--proj.pierce <= 0) return;
+    }
+    game.projectiles.push(proj);
   }
 
   takeDamage(amount, game) {
@@ -123,7 +166,7 @@ class Player {
       game.fx.text(this.x, this.y - 12, 'Block', '#7fd4ff');
       return;
     }
-    amount = Math.round(amount);
+    amount = Math.max(1, Math.round(amount * (1 - this.bonus('armor'))));
     this.hp -= amount;
     this.hurtT = 0.15;
     this.lastHit = game.time;
@@ -137,11 +180,11 @@ class Player {
 
   gainXp(amount, game) {
     if (this.level >= MAX_LEVEL) return;
-    this.xp += amount;
+    this.xp += amount * (1 + this.bonus('xpGain'));
     while (this.level < MAX_LEVEL && this.xp >= xpForLevel(this.level)) {
       this.xp -= xpForLevel(this.level);
       this.level++;
-      this.maxHp += this.cls.growth.hp;
+      this.recalcMaxHp();
       this.hp = this.maxHp;
       game.levelUp();
     }
