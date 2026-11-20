@@ -33,6 +33,18 @@ const Font = {
     for (const ch of this.norm(text)) w += ((this.glyphs[ch] || this.glyphs['?']).w + 1) * scale;
     return Math.max(0, w - scale);
   },
+  // Teilt Text in Zeilen, die höchstens maxWidth Pixel breit sind
+  wrap(text, maxWidth, scale = 1) {
+    const lines = [];
+    let line = '';
+    for (const word of String(text).split(' ')) {
+      const next = line ? `${line} ${word}` : word;
+      if (line && this.width(next, scale) > maxWidth) { lines.push(line); line = word; }
+      else line = next;
+    }
+    if (line) lines.push(line);
+    return lines;
+  },
   draw(ctx, text, x, y, { color = '#f1ede2', scale = 1, align = 'left', shadow = '#1a1420' } = {}) {
     text = this.norm(text);
     const w = this.width(text, scale);

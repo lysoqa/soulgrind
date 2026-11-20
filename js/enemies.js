@@ -11,7 +11,34 @@ const ENEMY_TYPES = {
     name: 'Skelett-Schütze', sprites: ['skeleton'], hp: 35, speed: 26, contact: 0, xp: 8, r: 5, blood: '#e8e4d4',
     ranged: { dist: 95, cd: 1.9, speed: 85, dmg: 9 },
   },
+  lizard: {
+    name: 'Echse', sprites: ['lizard'], hp: 45, speed: 22, contact: 0, xp: 10, r: 5, blood: '#5fae3e',
+    // bleibt stehen, zeigt eine Warnlinie (charge) und feuert dann einen Strahl in diese Richtung
+    beam: { dist: 110, cd: 4, charge: 0.8, fire: 0.25, length: 170, width: 3, dmg: 16 },
+  },
 };
+
+SPR.lizard = makeSprite([
+  '............',
+  '.....kkkk...',
+  '....kqqqqk..',
+  '....kqqxqkk.',
+  '....kqqqqqqk',
+  '...kqqqQQQk.',
+  '..kqqffffqk.',
+  '.kqqqffffqk.',
+  'kqk.kqqqqk..',
+  'kk..kqkkqk..',
+  '....kk..kk..',
+  '............',
+], { q: '#5fae3e', Q: '#3b7326', f: '#e8c25a' });
+
+// Abstand eines Punktes zu einer Strecke (für den Strahl)
+function distToSegment(px, py, x1, y1, x2, y2) {
+  const vx = x2 - x1, vy = y2 - y1;
+  const t = Math.max(0, Math.min(1, ((px - x1) * vx + (py - y1) * vy) / (vx * vx + vy * vy)));
+  return Math.hypot(px - (x1 + vx * t), py - (y1 + vy * t));
+}
 
 // Mini-Boss: gleicher Gegnertyp, nur größer und stärker. Jeder weitere Boss wird noch etwas stärker.
 const BOSS = { scale: 2, hp: 12, dmg: 2, xp: 10, speed: 0.8, growthPerBoss: 0.5 };
@@ -38,6 +65,13 @@ class Enemy {
     this.xp = Math.round(t.xp * (1 + 0.1 * (level - 1)) * (boss ? BOSS.xp * bossMul : 1));
     this.seed = Math.random() * 100;
     this.fireT = t.ranged ? 1 + Math.random() : 0;
+    this.beamDmg = t.beam ? t.beam.dmg * dmgMul : 0;
+    this.beamCd = 1.5 + Math.random() * 1.5;
+    this.beamState = null; // null | 'charge' | 'fire'
+    this.beamT = 0;
+    this.beamAngle = 0;
+    this.beamHit = false;
+    this.stunT = 0;
     this.strafe = Math.random() < 0.5 ? 1 : -1;
     this.contactT = 0;
     this.flash = 0;
@@ -54,8 +88,41 @@ class Enemy {
     const ux = dx / d;
     const uy = dy / d;
     let mx = ux, my = uy;
+    this.contactT -= dt;
+    this.flash -= dt;
 
-    if (t.ranged) {
+    if (this.stunT > 0) {
+      // betäubt: keine Bewegung, kein Angriff, Strahl wird abgebrochen
+      this.stunT -= dt;
+      this.beamState = null;
+      mx = 0; my = 0;
+    } else if (t.beam) {
+      const b = t.beam;
+      if (this.beamState === 'charge') {
+        mx = 0; my = 0;
+        if ((this.beamT -= dt) <= 0) { this.beamState = 'fire'; this.beamT = b.fire; this.beamHit = false; }
+      } else if (this.beamState === 'fire') {
+        mx = 0; my = 0;
+        const len = b.length * this.scale;
+        const ex = this.x + Math.cos(this.beamAngle) * len;
+        const ey = this.y + Math.sin(this.beamAngle) * len;
+        if (!this.beamHit && distToSegment(p.x, p.y, this.x, this.y, ex, ey) < p.r + b.width * this.scale) {
+          p.takeDamage(this.beamDmg, game);
+          this.beamHit = true;
+        }
+        if ((this.beamT -= dt) <= 0) { this.beamState = null; this.beamCd = b.cd * (0.8 + Math.random() * 0.4); }
+      } else {
+        if (d > b.dist + 15) { mx = ux; my = uy; }
+        else if (d < b.dist - 25) { mx = -ux; my = -uy; }
+        else { mx = 0; my = 0; }
+        this.beamCd -= dt;
+        if (this.beamCd <= 0 && d < b.length * this.scale) {
+          this.beamState = 'charge';
+          this.beamT = b.charge;
+          this.beamAngle = Math.atan2(dy, dx); // Richtung wird festgelegt, danach kann man ausweichen
+        }
+      }
+    } else if (t.ranged) {
       if (d > t.ranged.dist + 15) { mx = ux; my = uy; }
       else if (d < t.ranged.dist - 15) { mx = -ux; my = -uy; }
       else { mx = -uy * this.strafe * 0.7; my = ux * this.strafe * 0.7; }
@@ -75,9 +142,7 @@ class Enemy {
 
     this.x += mx * this.speed * dt;
     this.y += my * this.speed * dt;
-    this.facing = dx < 0 ? -1 : 1;
-    this.contactT -= dt;
-    this.flash -= dt;
+    if (this.stunT <= 0 && !this.beamState) this.facing = dx < 0 ? -1 : 1;
 
     // Gegner dürfen nicht in den Helden hineinlaufen
     dx = p.x - this.x;
@@ -90,7 +155,7 @@ class Enemy {
       this.y = p.y - (dy / d) * minDist;
     }
 
-    if (t.contact && touching && this.contactT <= 0) {
+    if (t.contact && touching && this.contactT <= 0 && this.stunT <= 0) {
       p.takeDamage(this.contact, game);
       this.contactT = 0.8;
       // nach dem Treffer kurz zurückprallen, statt am Helden zu kleben
@@ -123,7 +188,38 @@ class Enemy {
 
     ctx.fillStyle = 'rgba(0,0,0,0.3)';
     ctx.fillRect(sx - 4 * this.scale, sy + half - 1, 9 * this.scale, 2 * this.scale);
+    if (this.beamState) {
+      const b = this.type.beam;
+      const len = b.length * this.scale;
+      const ex = sx + Math.cos(this.beamAngle) * len;
+      const ey = sy + Math.sin(this.beamAngle) * len;
+      ctx.beginPath();
+      ctx.moveTo(sx, sy);
+      ctx.lineTo(ex, ey);
+      if (this.beamState === 'charge') {
+        // Warnlinie: wird kurz vor dem Schuss heller
+        ctx.strokeStyle = `rgba(255,50,40,${0.5 + 0.5 * (1 - this.beamT / b.charge)})`;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      } else {
+        ctx.strokeStyle = '#ff9a3c';
+        ctx.lineWidth = b.width * 2 * this.scale;
+        ctx.stroke();
+        ctx.strokeStyle = '#fff4c2';
+        ctx.lineWidth = Math.max(1, b.width * this.scale - 1);
+        ctx.stroke();
+      }
+    }
     drawSprite(ctx, spr, sx, sy + hover, { flip: this.facing < 0, white: this.flash > 0, scale: this.scale });
+
+    // Betäubung: kreisende Sterne über dem Kopf
+    if (this.stunT > 0) {
+      ctx.fillStyle = '#ffd34a';
+      for (let i = 0; i < 3; i++) {
+        const a = game.time * 6 + (i * Math.PI * 2) / 3;
+        ctx.fillRect(Math.round(sx + Math.cos(a) * 5 * this.scale), Math.round(sy + hover - half - 2 + Math.sin(a) * 1.5), 1, 1);
+      }
+    }
 
     if (this.hp < this.maxHp) {
       const w = 12 * this.scale;
@@ -142,6 +238,7 @@ function pickEnemyType(level) {
     zombie: 45,
     bat: 30 + level,
     skeleton: level >= 2 ? 15 + level * 2 : 0,
+    lizard: level >= 3 ? 5 + level * 0.5 : 0, // selten, erst ab Gegnerlevel 3
   };
   const total = Object.values(weights).reduce((a, b) => a + b, 0);
   let r = Math.random() * total;

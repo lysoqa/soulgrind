@@ -48,20 +48,20 @@ function drawHUD(ctx, game) {
     drawPips(ctx, 15, y + 1, rank, { size: 3 });
   });
 
-  // Block-Anzeige (Krieger)
-  if (p.cls.block) {
+  // Fähigkeit (Rechtsklick) mit Abklingzeit
+  {
     const bx = x + w + 10;
     const by = H - 34;
     ctx.fillStyle = '#1a1420';
     ctx.fillRect(bx - 1, by - 1, 16, 16);
-    ctx.fillStyle = p.blockT > 0 ? '#2d5a73' : '#2a2230';
+    ctx.fillStyle = p.abilityActive ? '#2d5a73' : '#2a2230';
     ctx.fillRect(bx, by, 14, 14);
-    drawSprite(ctx, SPR.shield, bx + 7, by + 7);
-    if (p.blockCd > 0 && p.blockT <= 0) {
-      const frac = p.blockCd / p.cls.block.cooldown;
+    drawSprite(ctx, ABILITY_ICONS[p.ability.id], bx + 7, by + 7);
+    if (p.abilityCd > 0 && !p.abilityActive) {
+      const frac = p.abilityCd / p.ability.cooldown;
       ctx.fillStyle = 'rgba(10,8,14,0.7)';
       ctx.fillRect(bx, by, 14, Math.ceil(14 * frac));
-      Font.draw(ctx, Math.ceil(p.blockCd), bx + 7, by + 5, { align: 'center' });
+      Font.draw(ctx, Math.ceil(p.abilityCd), bx + 7, by + 5, { align: 'center' });
     }
     Font.draw(ctx, 'RK', bx + 18, by + 5, { color: '#8b8a95' });
   }
@@ -195,6 +195,63 @@ function drawSelect(ctx, game) {
   Font.draw(ctx, `v${GAME_VERSION}`, W - 4, H - 8, { align: 'right', color: '#3a3046', shadow: null });
 }
 
+// ---------- Fähigkeit wählen (nach der Klasse) ----------
+
+function abilityRects(n) {
+  const cw = 150, ch = 112, gap = 12;
+  const x0 = Math.round((W - (cw * n + gap * (n - 1))) / 2);
+  return Array.from({ length: n }, (_, i) => ({ x: x0 + i * (cw + gap), y: 52, w: cw, h: ch }));
+}
+
+function backRect() {
+  return { x: 8, y: 8, w: 52, h: 13 };
+}
+
+function drawAbilitySelect(ctx, game) {
+  const cls = CLASSES[game.pickedClass];
+  ctx.fillStyle = '#100c16';
+  ctx.fillRect(0, 0, W, H);
+
+  drawSprite(ctx, SPR[cls.sprite], W / 2, 18, { scale: 2 });
+  Font.draw(ctx, cls.name, W / 2, 30, { align: 'center', scale: 2 });
+  Font.draw(ctx, 'Wähle deine Fähigkeit (Rechtsklick)', W / 2, 42, { align: 'center', color: '#b9b4a6' });
+
+  abilityRects(cls.abilities.length).forEach((r, i) => {
+    const ab = cls.abilities[i];
+    const hover = i === game.hoverAbility;
+    const y = r.y - (hover ? 2 : 0);
+
+    ctx.fillStyle = '#000';
+    ctx.fillRect(r.x + 3, y + 3, r.w, r.h);
+    ctx.fillStyle = hover ? '#241c30' : '#1a1422';
+    ctx.fillRect(r.x, y, r.w, r.h);
+    ctx.strokeStyle = hover ? '#f1ede2' : '#3a3046';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(r.x + 0.5, y + 0.5, r.w - 1, r.h - 1);
+
+    drawSprite(ctx, ABILITY_ICONS[ab.id], r.x + r.w / 2, y + 20, { scale: 3 });
+    Font.draw(ctx, ab.name, r.x + r.w / 2, y + 38, { align: 'center', scale: 2, color: '#ffd34a' });
+    Font.wrap(ab.desc, r.w - 16).forEach((line, j) => {
+      Font.draw(ctx, line, r.x + r.w / 2, y + 54 + j * 8, { align: 'center', color: '#b9b4a6', shadow: null });
+    });
+    ctx.fillStyle = '#2a2038';
+    ctx.fillRect(r.x + 8, y + r.h - 17, r.w - 16, 11);
+    Font.draw(ctx, `Abklingzeit ${String(ab.cooldown).replace('.', ',')} s`, r.x + r.w / 2, y + r.h - 14, { align: 'center', shadow: null });
+    Font.draw(ctx, i + 1, r.x + 4, y + 4, { color: '#5d5868', shadow: null });
+  });
+
+  const b = backRect();
+  const overBack = inRect(Input.mouse, b);
+  ctx.fillStyle = overBack ? '#2a2038' : '#1a1422';
+  ctx.fillRect(b.x, b.y, b.w, b.h);
+  ctx.strokeStyle = '#3a3046';
+  ctx.strokeRect(b.x + 0.5, b.y + 0.5, b.w - 1, b.h - 1);
+  Font.draw(ctx, '< Zurück', b.x + b.w / 2, b.y + 4, { align: 'center', shadow: null, color: overBack ? '#f1ede2' : '#b9b4a6' });
+
+  Font.draw(ctx, cls.hint, W / 2, 180, { align: 'center', color: '#8b8a95' });
+  Font.draw(ctx, 'Klicken oder 1 / 2 · ESC zurück', W / 2, 194, { align: 'center', color: '#5d5868', shadow: null });
+}
+
 // ---------- Tod und Pause ----------
 
 function drawDead(ctx, game) {
@@ -211,11 +268,33 @@ function drawDead(ctx, game) {
   }
 }
 
-function drawPause(ctx) {
-  ctx.fillStyle = 'rgba(10,8,14,0.6)';
+function pauseButtons() {
+  const w = 130, h = 16;
+  return [
+    { x: (W - w) / 2, y: 92, w, h, label: 'Weiter (ESC)' },
+    { x: (W - w) / 2, y: 114, w, h, label: 'Run abbrechen' },
+  ];
+}
+
+function drawPause(ctx, game) {
+  ctx.fillStyle = 'rgba(10,8,14,0.7)';
   ctx.fillRect(0, 0, W, H);
-  Font.draw(ctx, 'Pause', W / 2, 80, { align: 'center', scale: 4 });
-  Font.draw(ctx, 'ESC zum Fortsetzen', W / 2, 112, { align: 'center', color: '#b9b4a6' });
+  Font.draw(ctx, 'Pause', W / 2, 52, { align: 'center', scale: 4 });
+  pauseButtons().forEach((b, i) => {
+    const hover = inRect(Input.mouse, b);
+    const danger = i === 1;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(b.x + 2, b.y + 2, b.w, b.h);
+    ctx.fillStyle = hover ? (danger ? '#5a1a24' : '#3a2a55') : '#1a1422';
+    ctx.fillRect(b.x, b.y, b.w, b.h);
+    ctx.strokeStyle = danger ? '#d93a4a' : '#8b3dff';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(b.x + 0.5, b.y + 0.5, b.w - 1, b.h - 1);
+    Font.draw(ctx, b.label, W / 2, b.y + 6, { align: 'center', color: danger ? '#ff8a8a' : '#f1ede2' });
+  });
+  Font.draw(ctx, 'Beim Abbrechen ist dein Held verloren.', W / 2, 140, { align: 'center', color: '#8b8a95', shadow: null });
+  const p = game.player;
+  Font.draw(ctx, `${p.cls.name} · ${p.ability.name} · Level ${p.level} · ${fmtTime(game.runTime)}`, W / 2, 160, { align: 'center', color: '#5d5868', shadow: null });
 }
 
 function drawCrosshair(ctx) {

@@ -1,5 +1,5 @@
 // Spielschleife, Kamera, Effekte und Spielzustände (Auswahl, Spielen, Tod)
-const GAME_VERSION = '0.2.0';
+const GAME_VERSION = '0.3.0';
 const W = 384;
 const H = 216;
 const WORLD = 1600;
@@ -18,7 +18,9 @@ addEventListener('resize', fit);
 fit();
 
 const game = {
-  state: 'select', // select | play | dead
+  state: 'select', // select (Klasse) | ability (Fähigkeit) | play | dead
+  pickedClass: null,
+  hoverAbility: -1,
   paused: false,
   choice: null, // offene Stat-Auswahl nach einem Level-Up
   pendingChoices: 0,
@@ -41,8 +43,15 @@ const game = {
   hoverCard: -1,
   lastRun: null,
 
-  start(classId) {
-    this.player = new Player(CLASSES[classId], WORLD / 2, WORLD / 2);
+  pickClass(classId) {
+    this.pickedClass = classId;
+    this.hoverAbility = -1;
+    this.state = 'ability';
+  },
+
+  start(classId, abilityIndex) {
+    const cls = CLASSES[classId];
+    this.player = new Player(cls, cls.abilities[abilityIndex], WORLD / 2, WORLD / 2);
     this.enemies = [];
     this.projectiles = [];
     this.particles = [];
@@ -139,6 +148,30 @@ const game = {
     }
   },
 
+  // ---------- Pausenmenü (ESC) ----------
+
+  updatePauseMenu() {
+    if (!Input.leftPressed) return;
+    const [resume, abort] = pauseButtons();
+    if (inRect(Input.mouse, resume)) {
+      this.paused = false;
+      Input.mouse.left = false;
+    } else if (inRect(Input.mouse, abort)) {
+      this.abortRun();
+    }
+  },
+
+  // Run abbrechen und zurück ins Hauptmenü (der Held ist danach weg)
+  abortRun() {
+    this.paused = false;
+    this.choice = null;
+    this.pendingChoices = 0;
+    this.player = null;
+    this.enemies = [];
+    this.projectiles = [];
+    this.state = 'select';
+  },
+
   die() {
     const p = this.player;
     this.state = 'dead';
@@ -169,17 +202,27 @@ const game = {
     this.time += dt;
 
     if (this.state === 'select') {
-      ['Digit1', 'Digit2', 'Digit3'].forEach((k, i) => { if (Input.wasPressed(k)) this.start(CLASS_ORDER[i]); });
-      if (Input.leftPressed && this.hoverCard >= 0) {
+      ['Digit1', 'Digit2', 'Digit3'].forEach((k, i) => { if (Input.wasPressed(k)) this.pickClass(CLASS_ORDER[i]); });
+      if (Input.leftPressed && this.hoverCard >= 0) this.pickClass(CLASS_ORDER[this.hoverCard]);
+      return;
+    }
+
+    if (this.state === 'ability') {
+      const n = CLASSES[this.pickedClass].abilities.length;
+      this.hoverAbility = abilityRects(n).findIndex((r) => inRect(Input.mouse, r));
+      ['Digit1', 'Digit2'].forEach((k, i) => { if (Input.wasPressed(k)) this.start(this.pickedClass, i); });
+      if (Input.wasPressed('Escape') || (Input.leftPressed && inRect(Input.mouse, backRect()))) {
+        this.state = 'select';
+      } else if (Input.leftPressed && this.hoverAbility >= 0) {
         Input.mouse.left = false; // erster Klick soll nicht gleich angreifen
-        this.start(CLASS_ORDER[this.hoverCard]);
+        this.start(this.pickedClass, this.hoverAbility);
       }
       return;
     }
 
     if (this.state === 'play' && this.choice) { this.updateChoice(); return; }
     if (this.state === 'play' && Input.wasPressed('Escape')) this.paused = !this.paused;
-    if (this.paused) return;
+    if (this.paused) { this.updatePauseMenu(); return; }
 
     if (this.state === 'play') {
       this.runTime += dt;
@@ -230,8 +273,9 @@ const game = {
   },
 
   draw() {
-    if (this.state === 'select') {
-      drawSelect(ctx, this);
+    if (this.state === 'select' || this.state === 'ability') {
+      if (this.state === 'select') drawSelect(ctx, this);
+      else drawAbilitySelect(ctx, this);
       drawCrosshair(ctx);
       return;
     }
@@ -276,7 +320,7 @@ const game = {
       }
       drawHUD(ctx, this);
       if (this.choice) drawChoice(ctx, this);
-      else if (this.paused) drawPause(ctx);
+      else if (this.paused) drawPause(ctx, this);
     } else {
       drawDead(ctx, this);
     }
