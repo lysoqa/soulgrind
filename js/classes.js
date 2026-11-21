@@ -34,8 +34,8 @@ const CLASSES = {
     // Ult (Taste R): lädt pro Kill auf, bei 100 % einsetzbar
     ult: {
       id: 'storm', name: 'Wirbelsturm', perKill: 0.04, duration: 5,
-      desc: '5 s Dauer-Wirbelwind mit großer Reichweite. Du läufst durch Gegner und nimmst 80 % weniger Schaden.',
-      radius: 38, tick: 0.25, dmgFactor: 0.5, knockback: 4, dmgTaken: 0.2,
+      desc: '5 s Dauer-Wirbelwind mit großer Reichweite. Du bist 60 % schneller, läufst durch Gegner und nimmst 80 % weniger Schaden.',
+      radius: 38, tick: 0.25, dmgFactor: 0.5, knockback: 4, dmgTaken: 0.2, moveSpeed: 0.6, // +60 % Lauftempo
     },
   },
   archer: {

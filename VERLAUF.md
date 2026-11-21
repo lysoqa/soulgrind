@@ -55,6 +55,8 @@ Neue wichtige Entscheidungen bitte unten ergänzen.
   - **Spielstände** pro Klasse auf den Klassenkarten: beste Zeit pro Ebene (grün = geschafft) und Kills, unten Kills gesamt. Gespeichert im localStorage des Spiels, bleibt über Updates erhalten.
   - **Developer-Modus** (F1) nur aus dem Projektordner `Soulgrind-Game`, nicht in installierten Versionen. Kann Ebene springen, Timer vor Boss setzen, Level, Ult füllen, unverwundbar, alle Gegner töten. Dev-Runs zählen nicht für Spielstände.
 
+- **v0.5.1 (Hotfix):** Krieger-Ult Wirbelsturm gibt zusätzlich +60 % Lauftempo.
+
 ## Offene Punkte und Ideen
 - **Boss für Ebene 2** fehlt noch (der Nutzer liefert die Idee).
 - **Erholung** (+0,1 Leben/s pro Rang, wie vom Nutzer vorgegeben) ist sehr schwach, weil es zusätzlich eine Grund-Regeneration gibt (2 % Leben/s nach 4 s ohne Treffer). Noch nicht entschieden, ob die Grund-Regeneration wegfällt oder Erholung stärker wird.

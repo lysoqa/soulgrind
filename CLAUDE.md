@@ -44,7 +44,7 @@ Der Launcher startet das Spiel bei `npm start` direkt aus `../Soulgrind-Game`. I
 - **Level:** max. 20, XP-Bedarf steigt stark. Bei jedem Level-Up 1 von 3 Stats wählen.
 - **Stats:** max. Rang 5 pro Stat, max. 5 verschiedene Stats pro Run, 2 Rerolls pro Run.
   Schaden +3 %, Rüstung -3 % Schaden, Max. Leben +8 %, Erholung +0,1 HP/s, Geschosstempo +6 %, Lauftempo +3 %, Mehr XP +3 %, Angriffstempo +3 % (pro Rang).
-- **Ults (Taste R):** laden pro Kill auf, bei 100 % einsetzbar, je 5 s. Krieger: Wirbelsturm (Dauer-Wirbelwind, größere Reichweite, durch Gegner laufen, -80 % Schaden aus allen Quellen), 4 %/Kill. Schütze: Pfeilrausch (viel Lauf- und Angriffstempo, Pfeile durchbohren 5 Gegner), 3 %/Kill. Magier: Feuerbrand (Feuerzone am Mauszeiger, Dauerschaden), 4 %/Kill. Ult wird bei der Fähigkeitswahl erklärt.
+- **Ults (Taste R):** laden pro Kill auf, bei 100 % einsetzbar, je 5 s. Krieger: Wirbelsturm (Dauer-Wirbelwind, größere Reichweite, +60 % Lauftempo, durch Gegner laufen, -80 % Schaden aus allen Quellen), 4 %/Kill. Schütze: Pfeilrausch (viel Lauf- und Angriffstempo, Pfeile durchbohren 5 Gegner), 3 %/Kill. Magier: Feuerbrand (Feuerzone am Mauszeiger, Dauerschaden), 4 %/Kill. Ult wird bei der Fähigkeitswahl erklärt.
 - **Gift (Dornenpflanzen):** 5 Schaden pro Treffer + 1 pro Sekunde für 5 s, stapelt sich nicht (neuer Treffer startet die Dauer neu).
 - **Skelette** ab 2:00 Rundenzeit seltener.
 - **Spielstände:** pro Klasse beste Zeit pro Ebene (grün = geschafft) und Kills, im Startmenü. Runs mit Dev-Modus zählen nicht.
