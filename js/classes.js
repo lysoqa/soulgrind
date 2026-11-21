@@ -31,6 +31,12 @@ const CLASSES = {
         radius: 28, dmgFactor: 1.2, knockback: 12,
       },
     ],
+    // Ult (Taste R): lädt pro Kill auf, bei 100 % einsetzbar
+    ult: {
+      id: 'storm', name: 'Wirbelsturm', perKill: 0.04, duration: 5,
+      desc: '5 s Dauer-Wirbelwind mit großer Reichweite. Du läufst durch Gegner und nimmst 80 % weniger Schaden.',
+      radius: 38, tick: 0.25, dmgFactor: 0.5, knockback: 4, dmgTaken: 0.2,
+    },
   },
   archer: {
     id: 'archer',
@@ -61,6 +67,11 @@ const CLASSES = {
         spread: 0.3,
       },
     ],
+    ult: {
+      id: 'frenzy', name: 'Pfeilrausch', perKill: 0.03, duration: 5,
+      desc: '5 s viel schneller laufen und schießen. Jeder Pfeil durchbohrt bis zu 5 Gegner.',
+      moveSpeed: 0.5, attackSpeed: 1.0, pierce: 5, // +50 % Lauftempo, +100 % Angriffstempo
+    },
   },
   mage: {
     id: 'mage',
@@ -92,6 +103,11 @@ const CLASSES = {
         radius: 55, stun: 3, dmgFactor: 0.5,
       },
     ],
+    ult: {
+      id: 'firezone', name: 'Feuerbrand', perKill: 0.04, duration: 5,
+      desc: 'Entfacht 5 s lang eine Feuerzone am Mauszeiger, die alle Gegner darin ständig verbrennt.',
+      radius: 36, tick: 0.25, dmgFactor: 0.45,
+    },
   },
 };
 const CLASS_ORDER = ['warrior', 'archer', 'mage'];
@@ -113,5 +129,15 @@ const ABILITY_ICONS = {
   ]),
   stun: makeSprite([
     '..ccccc..', '.c.....c.', 'c..y.y..c', 'c...y...c', 'c..y.y..c', 'c.......c', '.c.....c.', '..ccccc..', '.........',
+  ]),
+  // Ults
+  storm: makeSprite([
+    '.m..m..m.', '..m.m.m..', 'm..yyy..m', '.my...ym.', 'mmy.b.ymm', '.my...ym.', 'm..yyy..m', '..m.m.m..', '.m..m..m.',
+  ]),
+  frenzy: makeSprite([
+    'm.m.m....', '.lllllll.', 'm.m.m...m', '.......mm', 'm.m.m.mmm', '.......mm', 'm.m.m...m', '.lllllll.', 'm.m.m....',
+  ]),
+  firezone: makeSprite([
+    '....y....', '...yry...', '..y.r.y..', '.yrrRrry.', 'yrRRyRRry', '.rRyyyRr.', '..rRRRr..', '.RRRRRRR.', '.........',
   ]),
 };

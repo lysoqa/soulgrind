@@ -83,6 +83,37 @@ function drawHUD(ctx, game) {
       Font.draw(ctx, Math.ceil(p.abilityCd), bx + 7, by + 5, { align: 'center' });
     }
     Font.draw(ctx, 'RK', bx + 18, by + 5, { color: '#8b8a95' });
+
+    // Ult (R): füllt sich von unten mit jedem Kill
+    const ux = bx + 32;
+    const u = p.ult;
+    const ready = p.ultReady;
+    const glow = ready && Math.floor(game.time * 4) % 2 === 0;
+    ctx.fillStyle = glow ? '#ffd34a' : '#1a1420';
+    ctx.fillRect(ux - 1, by - 1, 16, 16);
+    ctx.fillStyle = p.ultActive ? '#5a3a10' : '#2a2230';
+    ctx.fillRect(ux, by, 14, 14);
+    if (!p.ultActive && !ready) {
+      const fh = Math.round(14 * p.ultCharge);
+      ctx.fillStyle = '#5a4a20';
+      ctx.fillRect(ux, by + 14 - fh, 14, fh);
+    }
+    drawSprite(ctx, ABILITY_ICONS[u.id], ux + 7, by + 7);
+    if (p.ultActive) Font.draw(ctx, Math.ceil(p.ultT), ux + 7, by + 5, { align: 'center', color: '#ffd34a' });
+    else if (!ready) {
+      ctx.fillStyle = 'rgba(10,8,14,0.45)';
+      ctx.fillRect(ux, by, 14, 14);
+      Font.draw(ctx, `${Math.floor(p.ultCharge * 100)}`, ux + 7, by + 5, { align: 'center', color: '#b9b4a6' });
+    }
+    Font.draw(ctx, 'R', ux + 18, by + 5, { color: ready ? '#ffd34a' : '#8b8a95' });
+  }
+
+  // Gift
+  if (p.poisonT > 0) Font.draw(ctx, `Gift ${Math.ceil(p.poisonT)}s`, W / 2, H - 31, { align: 'center', color: '#9be05a' });
+
+  // Developer-Modus
+  if (DEV_MODE) {
+    Font.draw(ctx, game.devGod ? 'F1 Dev · unverwundbar' : 'F1 Dev', W - 6, 14, { align: 'right', color: '#8b3dff', shadow: null });
   }
 
   // Level-Up-Banner (nur wenn keine Auswahl offen ist)
@@ -161,7 +192,7 @@ function drawChoice(ctx, game) {
 // ---------- Klassenauswahl ----------
 
 function cardRects() {
-  const cw = 112, ch = 122, gap = 10;
+  const cw = 112, ch = 130, gap = 10;
   const x0 = Math.round((W - (cw * 3 + gap * 2)) / 2);
   return CLASS_ORDER.map((id, i) => ({ id, x: x0 + i * (cw + gap), y: 50, w: cw, h: ch }));
 }
@@ -198,7 +229,7 @@ function drawSelect(ctx, game) {
     Font.draw(ctx, cls.gear, r.x + r.w / 2, y + 62, { align: 'center', color: '#ffd34a' });
 
     Object.entries(cls.pips).forEach(([label, val], j) => {
-      const py = y + 76 + j * 9;
+      const py = y + 71 + j * 8;
       Font.draw(ctx, label, r.x + 8, py, { color: '#b9b4a6', shadow: null });
       for (let k = 0; k < 5; k++) {
         ctx.fillStyle = k < val ? '#8b3dff' : '#3a3046';
@@ -206,20 +237,33 @@ function drawSelect(ctx, game) {
       }
     });
     Font.draw(ctx, i + 1, r.x + r.w - 6, y + r.h - 9, { align: 'right', color: '#5d5868', shadow: null });
+
+    // Spielstand dieser Klasse: beste Zeit pro Ebene (grün = geschafft) und Kills
+    const rec = Records.forClass(r.id);
+    ctx.fillStyle = '#2a2038';
+    ctx.fillRect(r.x + 4, y + 107, r.w - 8, 1);
+    STAGES.forEach((st, k) => {
+      const n = k + 1;
+      const best = rec.best[n];
+      const color = rec.cleared[n] ? '#9be05a' : best !== undefined ? '#f1ede2' : '#5d5868';
+      Font.draw(ctx, `E${n} ${best !== undefined ? fmtTime(best) : '-'}`, r.x + 8 + k * 50, y + 111, { color, shadow: null });
+    });
+    Font.draw(ctx, `Kills ${rec.kills}`, r.x + 8, y + 120, { color: '#b9b4a6', shadow: null });
   });
 
-  const hint = game.hoverCard >= 0 ? CLASSES[CLASS_ORDER[game.hoverCard]].hint : 'WASD laufen · Maus zielen · Linksklick angreifen · Q Auto-Schuss';
-  Font.draw(ctx, hint, W / 2, 186, { align: 'center', color: '#b9b4a6' });
-  Font.draw(ctx, 'Klicken oder 1 / 2 / 3 drücken', W / 2, 198, { align: 'center', color: '#5d5868', shadow: null });
-  Font.draw(ctx, `v${GAME_VERSION}`, W - 4, H - 8, { align: 'right', color: '#3a3046', shadow: null });
+  const hint = game.hoverCard >= 0 ? CLASSES[CLASS_ORDER[game.hoverCard]].hint : 'WASD laufen · Maus zielen · Linksklick angreifen · Q Auto · R Ult';
+  Font.draw(ctx, hint, W / 2, 188, { align: 'center', color: '#b9b4a6' });
+  Font.draw(ctx, 'Klicken oder 1 / 2 / 3 drücken', W / 2, 199, { align: 'center', color: '#5d5868', shadow: null });
+  Font.draw(ctx, `Kills gesamt ${Records.totalKills()}`, 4, H - 8, { color: '#5d5868', shadow: null });
+  Font.draw(ctx, `v${GAME_VERSION}${DEV_MODE ? ' dev' : ''}`, W - 4, H - 8, { align: 'right', color: '#3a3046', shadow: null });
 }
 
 // ---------- Fähigkeit wählen (nach der Klasse) ----------
 
 function abilityRects(n) {
-  const cw = 150, ch = 112, gap = 12;
+  const cw = 150, ch = 100, gap = 12;
   const x0 = Math.round((W - (cw * n + gap * (n - 1))) / 2);
-  return Array.from({ length: n }, (_, i) => ({ x: x0 + i * (cw + gap), y: 52, w: cw, h: ch }));
+  return Array.from({ length: n }, (_, i) => ({ x: x0 + i * (cw + gap), y: 50, w: cw, h: ch }));
 }
 
 function backRect() {
@@ -248,10 +292,10 @@ function drawAbilitySelect(ctx, game) {
     ctx.lineWidth = 1;
     ctx.strokeRect(r.x + 0.5, y + 0.5, r.w - 1, r.h - 1);
 
-    drawSprite(ctx, ABILITY_ICONS[ab.id], r.x + r.w / 2, y + 20, { scale: 3 });
-    Font.draw(ctx, ab.name, r.x + r.w / 2, y + 38, { align: 'center', scale: 2, color: '#ffd34a' });
+    drawSprite(ctx, ABILITY_ICONS[ab.id], r.x + r.w / 2, y + 17, { scale: 3 });
+    Font.draw(ctx, ab.name, r.x + r.w / 2, y + 33, { align: 'center', scale: 2, color: '#ffd34a' });
     Font.wrap(ab.desc, r.w - 16).forEach((line, j) => {
-      Font.draw(ctx, line, r.x + r.w / 2, y + 54 + j * 8, { align: 'center', color: '#b9b4a6', shadow: null });
+      Font.draw(ctx, line, r.x + r.w / 2, y + 48 + j * 8, { align: 'center', color: '#b9b4a6', shadow: null });
     });
     ctx.fillStyle = '#2a2038';
     ctx.fillRect(r.x + 8, y + r.h - 17, r.w - 16, 11);
@@ -267,8 +311,22 @@ function drawAbilitySelect(ctx, game) {
   ctx.strokeRect(b.x + 0.5, b.y + 0.5, b.w - 1, b.h - 1);
   Font.draw(ctx, '< Zurück', b.x + b.w / 2, b.y + 4, { align: 'center', shadow: null, color: overBack ? '#f1ede2' : '#b9b4a6' });
 
-  Font.draw(ctx, cls.hint, W / 2, 180, { align: 'center', color: '#8b8a95' });
-  Font.draw(ctx, 'Klicken oder 1 / 2 · ESC zurück', W / 2, 194, { align: 'center', color: '#5d5868', shadow: null });
+  // Ult der Klasse (immer dabei, Taste R)
+  const u = cls.ult;
+  const kills = Math.ceil(1 / u.perKill - 1e-9);
+  const ub = { x: 30, y: 158, w: W - 60, h: 36 };
+  ctx.fillStyle = '#1a1422';
+  ctx.fillRect(ub.x, ub.y, ub.w, ub.h);
+  ctx.strokeStyle = '#8a6a20';
+  ctx.strokeRect(ub.x + 0.5, ub.y + 0.5, ub.w - 1, ub.h - 1);
+  drawSprite(ctx, ABILITY_ICONS[u.id], ub.x + 14, ub.y + 18, { scale: 2 });
+  Font.draw(ctx, `Ult (R): ${u.name}`, ub.x + 30, ub.y + 5, { color: '#ffd34a', shadow: null });
+  Font.draw(ctx, `Lädt ${Math.round(u.perKill * 100)} % pro Kill · voll nach ${kills} Kills`, ub.x + ub.w - 6, ub.y + 5, { align: 'right', color: '#8b8a95', shadow: null });
+  Font.wrap(u.desc, ub.w - 38).forEach((line, j) => {
+    Font.draw(ctx, line, ub.x + 30, ub.y + 15 + j * 8, { color: '#b9b4a6', shadow: null });
+  });
+
+  Font.draw(ctx, 'Klicken oder 1 / 2 · ESC zurück', W / 2, 203, { align: 'center', color: '#5d5868', shadow: null });
 }
 
 // ---------- Tod und Pause ----------
@@ -280,11 +338,62 @@ function drawDead(ctx, game) {
   Font.draw(ctx, 'Du bist gefallen', W / 2, 46, { align: 'center', scale: 3, color: '#ff5a5a', shadow: '#3a0a10' });
   Font.draw(ctx, `${s.cls} · Level ${s.level} · Ebene ${s.stage}`, W / 2, 78, { align: 'center', scale: 2 });
   Font.draw(ctx, `Überlebt ${fmtTime(s.time)}`, W / 2, 96, { align: 'center', color: '#f1ede2' });
+  if (s.newBest) Font.draw(ctx, 'Neue Bestzeit!', W / 2, 140, { align: 'center', color: '#ffd34a' });
+  else if (s.dev) Font.draw(ctx, 'Dev-Modus benutzt · nicht gespeichert', W / 2, 140, { align: 'center', color: '#8b3dff' });
   Font.draw(ctx, `Kills ${s.kills} · Bosse ${s.bosses}`, W / 2, 106, { align: 'center', color: '#b9b4a6' });
   Font.draw(ctx, 'Dein Held ist für immer verloren.', W / 2, 126, { align: 'center', color: '#8b8a95' });
   if (game.deadT > 1.2 && Math.floor(game.time * 2) % 2 === 0) {
     Font.draw(ctx, 'Klicken für einen neuen Helden', W / 2, 156, { align: 'center', color: '#ffd34a' });
   }
+}
+
+// Feuerzone der Magier-Ult: flackernder Glutboden
+function drawFireZones(ctx, cam, game) {
+  for (const z of game.zones) {
+    const sx = Math.round(z.x - cam.x);
+    const sy = Math.round(z.y - cam.y);
+    const fade = Math.min(1, z.t / 0.5);
+    ctx.globalAlpha = 0.35 * fade;
+    ctx.fillStyle = '#ff5a2a';
+    ctx.beginPath();
+    ctx.arc(sx, sy, z.radius, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 0.5 * fade;
+    ctx.fillStyle = '#ffd34a';
+    ctx.beginPath();
+    ctx.arc(sx, sy, z.radius * (0.45 + 0.08 * Math.sin(game.time * 12)), 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = fade;
+    ctx.fillStyle = '#ff9a3c';
+    for (let i = 0; i < 24; i++) {
+      const a = (i * Math.PI * 2) / 24 - game.time * 1.5;
+      ctx.fillRect(Math.round(sx + Math.cos(a) * z.radius), Math.round(sy + Math.sin(a) * z.radius), 1, 1);
+    }
+    ctx.globalAlpha = 1;
+  }
+}
+
+// ---------- Developer-Menü (F1) ----------
+
+const DEV_ACTIONS = [
+  'Zur nächsten Ebene springen',
+  'Timer auf 5 s vor dem Ebenen-Boss',
+  '+1 Level',
+  'Ult sofort voll',
+  'Unverwundbar an / aus',
+  'Alle Gegner töten',
+];
+
+function drawDevMenu(ctx, game) {
+  ctx.fillStyle = 'rgba(10,6,20,0.8)';
+  ctx.fillRect(0, 0, W, H);
+  Font.draw(ctx, 'Developer', W / 2, 30, { align: 'center', scale: 3, color: '#8b3dff' });
+  DEV_ACTIONS.forEach((label, i) => {
+    Font.draw(ctx, `${i + 1}   ${label}`, W / 2 - 80, 66 + i * 14, { color: '#f1ede2' });
+  });
+  Font.draw(ctx, `Unverwundbar: ${game.devGod ? 'an' : 'aus'}`, W / 2, 158, { align: 'center', color: '#b9b4a6' });
+  Font.draw(ctx, 'Taste 1-6 · F1 oder ESC schließt', W / 2, 176, { align: 'center', color: '#8b8a95' });
+  Font.draw(ctx, 'Runs mit Dev-Modus zählen nicht für die Spielstände.', W / 2, 190, { align: 'center', color: '#5d5868', shadow: null });
 }
 
 function drawStageClear(ctx, game) {
@@ -296,6 +405,7 @@ function drawStageClear(ctx, game) {
   Font.draw(ctx, `Ebene ${s.stage} geschafft!`, W / 2, 40, { align: 'center', scale: 3, color: '#9be05a', shadow: '#1a3010' });
   Font.draw(ctx, `${s.boss} ist besiegt.`, W / 2, 70, { align: 'center', scale: 2 });
   Font.draw(ctx, `${p.cls.name} · Level ${p.level} · Kills ${p.kills}`, W / 2, 92, { align: 'center', color: '#b9b4a6' });
+  if (s.newBest) Font.draw(ctx, 'Neuer Rekord!', W / 2, 102, { align: 'center', color: '#ffd34a' });
   if (next) {
     Font.draw(ctx, `Als Nächstes: Ebene ${s.stage + 1} · ${next.name}`, W / 2, 116, { align: 'center', color: '#f1ede2' });
     Font.draw(ctx, 'Dein Leben wird aufgefüllt.', W / 2, 126, { align: 'center', color: '#8b8a95' });

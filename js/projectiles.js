@@ -27,7 +27,8 @@ function updateProjectiles(dt, game) {
     } else {
       const pl = game.player;
       if (Math.hypot(pl.x - p.x, pl.y - p.y) < pl.r + p.r) {
-        pl.takeDamage(p.dmg, game);
+        const hit = pl.takeDamage(p.dmg, game);
+        if (hit && p.poison) pl.poisonT = POISON.duration; // Gift startet neu, stapelt sich nicht
         p.dead = true;
       }
     }

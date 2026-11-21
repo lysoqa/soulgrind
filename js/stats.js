@@ -1,20 +1,20 @@
 // Stats, die man bei jedem Level-Up wählen kann.
-// Jeder Stat geht bis Rang 5, pro Run sind höchstens 5 verschiedene Stats möglich.
+// per = Bonus pro Rang (0.03 = +3 %). Jeder Stat geht bis Rang 5, pro Run sind höchstens 5 verschiedene Stats möglich.
 const STAT_MAX_RANK = 5;
 const STAT_MAX_DISTINCT = 5;
 const REROLLS_PER_RUN = 2;
 
 const STATS = {
   damage: {
-    name: 'Schaden', per: 0.02, desc: '+2 % Schaden',
+    name: 'Schaden', per: 0.03, desc: '+3 % Schaden',
     icon: ['.....mM', '....mM.', '...mM..', 'y.mM...', '.yM....', '.by....', 'b..y...'],
   },
   armor: {
-    name: 'Rüstung', per: 0.02, desc: '-2 % erlittener Schaden',
+    name: 'Rüstung', per: 0.03, desc: '-3 % erlittener Schaden',
     icon: ['.hhhhh.', 'hhrrrhh', 'hrryrrh', 'hrrrrrh', '.hrrrh.', '..hrh..', '...h...'],
   },
   maxHp: {
-    name: 'Max. Leben', per: 0.07, desc: '+7 % maximales Leben',
+    name: 'Max. Leben', per: 0.08, desc: '+8 % maximales Leben',
     icon: ['.rr.rr.', 'rxrrrrr', 'rrrrrrr', 'rrrrrrr', '.rrrrr.', '..rrr..', '...r...'],
   },
   recovery: {
@@ -22,19 +22,19 @@ const STATS = {
     icon: ['..zzz..', '..zzz..', 'zzzzzzz', 'zzzzzzz', 'zzzzzzz', '..zzz..', '..zzz..'],
   },
   projSpeed: {
-    name: 'Geschosstempo', per: 0.05, desc: '+5 % Geschosstempo', ranged: true,
+    name: 'Geschosstempo', per: 0.06, desc: '+6 % Geschosstempo', ranged: true,
     icon: ['.......', '....m..', '.....m.', 'wllllmm', '.....m.', '....m..', '.......'],
   },
   moveSpeed: {
-    name: 'Lauftempo', per: 0.02, desc: '+2 % Lauftempo',
+    name: 'Lauftempo', per: 0.03, desc: '+3 % Lauftempo',
     icon: ['..LL...', '..LL...', '..LL...', '..LLl..', '..LLlll', '.bbbbbb', '.......'],
   },
   xpGain: {
-    name: 'Mehr XP', per: 0.02, desc: '+2 % XP',
+    name: 'Mehr XP', per: 0.03, desc: '+3 % XP',
     icon: ['...y...', '...y...', 'yyyyyyy', '.yyyyy.', '..yyy..', '.yy.yy.', 'y.....y'],
   },
   attackSpeed: {
-    name: 'Angriffstempo', per: 0.02, desc: '+2 % Angriffstempo',
+    name: 'Angriffstempo', per: 0.03, desc: '+3 % Angriffstempo',
     icon: ['....yy.', '...yy..', '..yy...', '.yyyyy.', '...yy..', '..yy...', '.yy....'],
   },
 };

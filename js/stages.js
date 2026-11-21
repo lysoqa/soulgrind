@@ -12,16 +12,20 @@ const STAGES = [
 // Volghard, der Naturbaum (Boss am Ende von Ebene 1). hp/dmg wachsen wie bei allen Gegnern mit dem Gegnerlevel.
 const VOLGHARD = {
   spawnDist: 140, // so weit weg vom Helden erscheint er
-  thornCd: 2.6, // Sekunden zwischen zwei Dornensalven
+  thornCd: 2.3, // Sekunden zwischen zwei Dornensalven
   windup: 0.45, // kurzes Zittern als Warnung vor jeder Salve
   ringThorns: 10, // Dornen beim Rundumschuss
   fanThorns: 5, // Dornen beim gezielten Fächer (abwechselnd mit dem Rundumschuss)
   fanSpread: 0.2,
   thornSpeed: 72,
   thornRange: 200,
-  plantCd: 10, // Sekunden zwischen zwei neuen Pflanzen
-  maxPlants: 3, // höchstens so viele Pflanzen gleichzeitig
+  plantCd: 7, // Sekunden zwischen zwei neuen Pflanzen
+  maxPlants: 5, // höchstens so viele Pflanzen gleichzeitig
 };
+
+// Gift der Dornenpflanzen: fester Schaden pro Treffer, dann Schaden pro Sekunde.
+// Ein neuer Treffer startet die Dauer neu, Gift stapelt sich nicht.
+const POISON = { hitDmg: 5, tickDmg: 1, duration: 5 };
 
 // Steinsäulen in Ebene 2
 const PILLAR = {
@@ -45,12 +49,12 @@ ENEMY_TYPES.troll = {
 ENEMY_TYPES.plant = {
   name: 'Dornenpflanze', sprites: ['plantA', 'plantB'], hp: 40, speed: 0, contact: 0, xp: 5, r: 5, blood: '#5fae3e',
   special: true, anchored: true, // kein Zufallsgegner, lässt sich nicht wegschubsen
-  ranged: { dist: 0, cd: 2.4, speed: 70, dmg: 6, shots: 1, kind: 'seed', range: 170 },
+  ranged: { dist: 0, cd: 1.6, speed: 100, dmg: 0, shots: 1, kind: 'seed', range: 190, fixedDmg: POISON.hitDmg, poison: true },
 };
 ENEMY_TYPES.volghard = {
-  name: 'Volghard', sprites: ['volghardA', 'volghardB'], hp: 900, speed: 12, contact: 15, xp: 400, r: 11, blood: '#4f9a3a',
+  name: 'Volghard', sprites: ['volghardA', 'volghardB'], hp: 1200, speed: 13, contact: 18, xp: 400, r: 11, blood: '#4f9a3a',
   special: true, tree: true,
-  thornDmg: 8,
+  thornDmg: 10,
 };
 
 // ---------- Sprites ----------

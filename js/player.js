@@ -37,14 +37,27 @@ class Player {
     this.moveDir = { x: 1, y: 0 };
     this.swing = null;
     this.kills = 0;
+    this.ultCharge = 0; // 0 bis 1, lädt pro Kill
+    this.ultT = 0; // Restdauer der aktiven Ult
+    this.ultTick = 0;
+    this.poisonT = 0; // Restdauer Gift
+    this.poisonTick = 0;
+  }
+
+  get ult() { return this.cls.ult; }
+  get ultActive() { return this.ultT > 0; }
+  get ultReady() { return this.ultCharge >= 1 && !this.ultActive; }
+
+  onKill() {
+    if (!this.ultActive) this.ultCharge = Math.min(1, this.ultCharge + this.ult.perKill);
   }
 
   rank(id) { return this.stats[id] || 0; }
   bonus(id) { return this.rank(id) * STATS[id].per; }
 
   get dmgMul() { return (1 + this.cls.growth.dmg * (this.level - 1)) * (1 + this.bonus('damage')); }
-  get speed() { return this.cls.speed * (1 + this.bonus('moveSpeed')); }
-  get cooldown() { return this.cls.cooldown / (1 + this.bonus('attackSpeed')); }
+  get speed() { return this.cls.speed * (1 + this.bonus('moveSpeed')) * (this.ultActive ? 1 + (this.ult.moveSpeed || 0) : 1); }
+  get cooldown() { return this.cls.cooldown / (1 + this.bonus('attackSpeed') + (this.ultActive ? this.ult.attackSpeed || 0 : 0)); }
   get projSpeed() { return this.cls.projSpeed * (1 + this.bonus('projSpeed')); }
   get abilityActive() { return this.blockT > 0 || !!this.spin || !!this.dash; }
 
@@ -103,13 +116,31 @@ class Player {
     if (this.swing && (this.swing.t += dt) >= this.swing.dur) this.swing = null;
     if (this.spin && (this.spin.t += dt) >= this.spin.dur) this.spin = null;
 
+    if (Input.wasPressed('KeyR') && this.ultReady) this.castUlt(game);
+    if (this.ultActive) this.updateUlt(dt, game);
+
+    // Gift: Schaden pro Sekunde, solange es wirkt
+    if (this.poisonT > 0) {
+      this.poisonT -= dt;
+      this.poisonTick += dt;
+      if (Math.random() < dt * 6) game.fx.particle(this.x, this.y - 2, '#9be05a', 0.5, 12);
+      if (this.poisonTick >= 1) {
+        this.poisonTick -= 1;
+        this.takeDamage(POISON.tickDmg, game, { tick: true });
+      }
+    } else {
+      this.poisonTick = 0;
+    }
+    if (game.state !== 'play') return; // am Gift gestorben
+
     if (Input.rightPressed && this.abilityCd <= 0) {
       this.useAbility(game);
       this.abilityCd = this.ability.cooldown;
     }
 
     // Linksklick gedrückt halten oder Auto-Schuss (Q) an
-    if ((Input.mouse.left || game.autoFire) && this.cd <= 0 && this.blockT <= 0 && !this.spin) {
+    const storming = this.ultActive && this.ult.id === 'storm';
+    if ((Input.mouse.left || game.autoFire) && this.cd <= 0 && this.blockT <= 0 && !this.spin && !storming) {
       this.attack(game);
       this.cd = this.cooldown;
     }
@@ -184,6 +215,46 @@ class Player {
     }
   }
 
+  // ---------- Ult (Taste R) ----------
+
+  castUlt(game) {
+    const u = this.ult;
+    this.ultCharge = 0;
+    this.ultT = u.duration;
+    this.ultTick = 0;
+    game.shake = 4;
+    if (u.id === 'storm') {
+      game.fx.ring(this.x, this.y, '#f1ede2', u.radius);
+    } else if (u.id === 'frenzy') {
+      game.fx.ring(this.x, this.y, '#9be05a', 20);
+      game.fx.burst(this.x, this.y, '#ffd34a', 16);
+    } else if (u.id === 'firezone') {
+      const m = game.mouseWorld();
+      game.zones.push({ x: m.x, y: m.y, t: u.duration, max: u.duration, tick: 0, radius: u.radius, owner: this });
+      game.fx.ring(m.x, m.y, '#ff9a3c', u.radius);
+      this.castT = 0.3;
+    }
+  }
+
+  updateUlt(dt, game) {
+    const u = this.ult;
+    this.ultT = Math.max(0, this.ultT - dt);
+    if (u.id === 'storm') {
+      // Dauer-Wirbelwind: trifft regelmäßig alle Gegner im Umkreis
+      this.ultTick -= dt;
+      if (this.ultTick <= 0) {
+        this.ultTick = u.tick;
+        for (const e of game.enemies) {
+          if (e.dead) continue;
+          if (Math.hypot(e.x - this.x, e.y - this.y) > u.radius + e.r) continue;
+          game.hitEnemy(e, Math.round(this.rollDamage() * u.dmgFactor), Math.atan2(e.y - this.y, e.x - this.x), u.knockback);
+        }
+      }
+    } else if (u.id === 'frenzy') {
+      if (Math.random() < dt * 20) game.fx.particle(this.x, this.y + 3, Math.random() < 0.5 ? '#9be05a' : '#ffd34a', 0.35, 8);
+    }
+  }
+
   // ---------- Angriff (Linksklick) ----------
 
   attack(game) {
@@ -218,7 +289,7 @@ class Player {
       life: c.range / speed,
       r: c.attack === 'orb' ? 3 : 2,
       dmg: this.rollDamage(),
-      pierce: c.pierce || 1,
+      pierce: this.ultActive && this.ult.pierce ? this.ult.pierce : c.pierce || 1,
       hit: new Set(),
       aoe: c.aoe || 0,
       aoeFactor: c.aoeFactor || 0,
@@ -247,23 +318,31 @@ class Player {
     game.projectiles.push(proj);
   }
 
-  takeDamage(amount, game) {
-    if (game.state !== 'play') return;
-    if (this.invulnT > 0) return;
+  // Gibt true zurück, wenn der Schaden wirklich angekommen ist (nicht geblockt)
+  takeDamage(amount, game, { tick = false } = {}) {
+    if (game.state !== 'play' || game.devGod) return false;
+    if (this.invulnT > 0) return false;
     if (this.blockT > 0) {
-      game.fx.text(this.x, this.y - 12, 'Block', '#7fd4ff');
-      return;
+      if (!tick) game.fx.text(this.x, this.y - 12, 'Block', '#7fd4ff');
+      return false;
     }
-    amount = Math.max(1, Math.round(amount * (1 - this.bonus('armor'))));
+    let mul = 1 - this.bonus('armor');
+    if (this.ultActive && this.ult.dmgTaken) mul *= this.ult.dmgTaken; // Wirbelsturm: 80 % weniger aus allen Quellen
+    amount = Math.max(1, Math.round(amount * mul));
     this.hp -= amount;
-    this.hurtT = 0.15;
     this.lastHit = game.time;
-    game.shake = 3;
-    game.fx.text(this.x, this.y - 12, `-${amount}`, '#ff5a5a');
+    if (tick) {
+      game.fx.text(this.x, this.y - 12, `-${amount}`, '#9be05a');
+    } else {
+      this.hurtT = 0.15;
+      game.shake = 3;
+      game.fx.text(this.x, this.y - 12, `-${amount}`, '#ff5a5a');
+    }
     if (this.hp <= 0) {
       this.hp = 0;
       game.die();
     }
+    return true;
   }
 
   gainXp(amount, game) {
@@ -303,6 +382,23 @@ class Player {
     const c = this.cls;
     if (c.attack === 'melee') {
       let ang = this.aim + (flip ? -0.5 : 0.5);
+      if (this.ultActive && this.ult.id === 'storm') {
+        // Wirbelsturm: Schwert dreht sich ständig, mit Windkreis
+        ang = game.time * 22;
+        const r = this.ult.radius - 4;
+        ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(sx, sy + 1, r, ang - 2.2, ang);
+        ctx.stroke();
+        ctx.strokeStyle = 'rgba(200,220,255,0.35)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(sx, sy + 1, r - 6, ang + 1, ang + 3);
+        ctx.stroke();
+        drawRotated(ctx, SPR.sword, sx, sy + 2, ang, 1);
+        return;
+      }
       if (this.spin) {
         const p = this.spin.t / this.spin.dur;
         ang = this.spin.start + Math.PI * 2 * p;

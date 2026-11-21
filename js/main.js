@@ -1,5 +1,5 @@
 // Spielschleife, Kamera, Effekte und Spielzustände (Auswahl, Spielen, Tod)
-const GAME_VERSION = '0.4.1';
+const GAME_VERSION = '0.5.0';
 const W = 384;
 const H = 216;
 const WORLD = 1600;
@@ -26,6 +26,11 @@ const game = {
   pillarT: 0,
   clearT: 0,
   autoFire: loadAutoFire(),
+  zones: [], // Feuerzonen (Magier-Ult)
+  devMenu: false, // Developer-Menü offen (F1, nur aus dem Projektordner)
+  devGod: false, // Developer: unverwundbar
+  devUsed: false, // in diesem Run wurde der Dev-Modus benutzt: keine Spielstände speichern
+  runRecorded: false,
   pickedClass: null,
   hoverAbility: -1,
   paused: false,
@@ -68,6 +73,10 @@ const game = {
     this.paused = false;
     this.choice = null;
     this.pendingChoices = 0;
+    this.devMenu = false;
+    this.devGod = false;
+    this.devUsed = false;
+    this.runRecorded = false;
     this.enterStage(0);
   },
 
@@ -82,6 +91,7 @@ const game = {
     this.texts = [];
     this.rings = [];
     this.pillars = [];
+    this.zones = [];
     this.pillarT = 3;
     this.runTime = 0;
     this.spawnT = 1;
@@ -107,9 +117,62 @@ const game = {
       this.fx.burst(e.x, e.y, e.type.blood, 10);
     }
     this.projectiles = [];
+    this.zones = [];
     this.state = 'cleared';
     this.clearT = 0;
-    this.lastClear = { stage: this.stage + 1, name: this.stageDef.name, boss: this.stageBoss.type.name, time: this.runTime };
+    const newBest = !this.devUsed && Records.submitStage(this.player.cls.id, this.stage + 1, this.runTime, true);
+    this.lastClear = { stage: this.stage + 1, name: this.stageDef.name, boss: this.stageBoss.type.name, time: this.runTime, newBest };
+  },
+
+  // Run endet (Tod oder Abbruch): Zeit der aktuellen Ebene und Kills speichern
+  recordRun() {
+    if (this.runRecorded || !this.player) return false;
+    this.runRecorded = true;
+    if (this.devUsed) return false;
+    const id = this.player.cls.id;
+    Records.addKills(id, this.player.kills);
+    return Records.submitStage(id, this.stage + 1, this.runTime, false);
+  },
+
+  // ---------- Developer-Modus (F1) ----------
+
+  devAction(n) {
+    const p = this.player;
+    const actions = {
+      1: () => { if (STAGES[this.stage + 1]) this.enterStage(this.stage + 1); },
+      2: () => { if (this.stageDef.duration && this.phase === 'waves') this.runTime = this.stageDef.duration - 5; },
+      3: () => p.gainXp((xpForLevel(p.level) - p.xp + 0.01) / (1 + p.bonus('xpGain')), this),
+      4: () => { p.ultCharge = 1; },
+      5: () => { this.devGod = !this.devGod; },
+      6: () => { for (const e of this.enemies) this.hitEnemy(e, e.hp + 1, 0, 0); },
+    };
+    if (!actions[n]) return;
+    this.devUsed = true;
+    this.devMenu = false;
+    actions[n]();
+  },
+
+  updateZones(dt) {
+    for (const z of this.zones) {
+      z.t -= dt;
+      z.tick -= dt;
+      const u = z.owner.ult;
+      if (z.tick <= 0) {
+        z.tick = u.tick;
+        for (const e of this.enemies) {
+          if (e.dead || Math.hypot(e.x - z.x, e.y - z.y) > z.radius + e.r) continue;
+          this.hitEnemy(e, Math.max(1, Math.round(z.owner.rollDamage() * u.dmgFactor)), 0, 0);
+        }
+      }
+      // Flammen
+      for (let i = 0; i < 3; i++) {
+        const a = Math.random() * Math.PI * 2;
+        const r = Math.sqrt(Math.random()) * z.radius;
+        const col = ['#ff5a2a', '#ff9a3c', '#ffd34a'][Math.floor(Math.random() * 3)];
+        this.particles.push({ x: z.x + Math.cos(a) * r, y: z.y + Math.sin(a) * r, vx: 0, vy: -20 - Math.random() * 20, life: 0.5, max: 0.5, color: col });
+      }
+    }
+    this.zones = this.zones.filter((z) => z.t > 0);
   },
 
   toggleAutoFire() {
@@ -134,6 +197,7 @@ const game = {
     if (e.hp <= 0) {
       e.dead = true;
       this.player.kills++;
+      this.player.onKill();
       if (e.boss) {
         this.bossKills++;
         this.shake = 6;
@@ -208,6 +272,7 @@ const game = {
 
   // Run abbrechen und zurück ins Hauptmenü (der Held ist danach weg)
   abortRun() {
+    this.recordRun();
     this.paused = false;
     this.choice = null;
     this.pendingChoices = 0;
@@ -222,7 +287,9 @@ const game = {
     this.state = 'dead';
     this.deadT = 0;
     this.choice = null;
-    this.lastRun = { cls: p.cls.name, level: p.level, kills: p.kills, bosses: this.bossKills, time: this.runTime, stage: this.stage + 1 };
+    this.devMenu = false;
+    const newBest = this.recordRun();
+    this.lastRun = { cls: p.cls.name, level: p.level, kills: p.kills, bosses: this.bossKills, time: this.runTime, stage: this.stage + 1, newBest, dev: this.devUsed };
     this.fx.burst(p.x, p.y, '#d93a4a', 30);
   },
 
@@ -266,12 +333,19 @@ const game = {
     }
 
     if (this.state === 'play' && this.choice) { this.updateChoice(); return; }
+    if (this.state === 'play' && DEV_MODE && Input.wasPressed('F1')) this.devMenu = !this.devMenu;
+    if (this.devMenu) {
+      if (Input.wasPressed('Escape')) this.devMenu = false;
+      for (let n = 1; n <= 6; n++) if (Input.wasPressed(`Digit${n}`)) this.devAction(n);
+      return;
+    }
     if (this.state === 'play' && Input.wasPressed('Escape')) this.paused = !this.paused;
     if (this.paused) { this.updatePauseMenu(); return; }
 
     if (this.state === 'play') {
       if (Input.wasPressed('KeyQ')) this.toggleAutoFire();
       this.player.update(dt, this);
+      this.updateZones(dt);
       this.updatePhase(dt);
     }
 
@@ -362,6 +436,7 @@ const game = {
     if (this.stageDef.ground === 'stone') drawStoneGround(ctx, cam);
     else drawGround(ctx, cam);
     drawPillarZones(ctx, cam, this);
+    drawFireZones(ctx, cam, this);
 
     const actors = [...this.enemies, ...this.pillars];
     if (this.state !== 'dead') actors.push(this.player);
@@ -399,6 +474,7 @@ const game = {
       }
       drawHUD(ctx, this);
       if (this.choice) drawChoice(ctx, this);
+      else if (this.devMenu) drawDevMenu(ctx, this);
       else if (this.paused) drawPause(ctx, this);
     } else if (this.state === 'cleared') {
       drawStageClear(ctx, this);
@@ -410,6 +486,9 @@ const game = {
 };
 
 const inRect = (m, r) => m.x >= r.x && m.x < r.x + r.w && m.y >= r.y && m.y < r.y + r.h;
+
+// Developer-Modus nur, wenn das Spiel direkt aus dem Projektordner läuft (nicht in installierten Versionen)
+const DEV_MODE = /\/Soulgrind-Game\//i.test(decodeURI(location.href));
 
 // Auto-Schuss (Q) bleibt über Runs hinweg gespeichert
 function loadAutoFire() {

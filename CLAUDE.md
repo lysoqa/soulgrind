@@ -25,12 +25,13 @@ Der Launcher startet das Spiel bei `npm start` direkt aus `../Soulgrind-Game`. I
 
 | Datei | Inhalt |
 |---|---|
-| `js/classes.js` | Klassen und ihre 2 Fähigkeiten (alle Balance-Werte) |
+| `js/classes.js` | Klassen, ihre 2 Fähigkeiten und ihre Ult (alle Balance-Werte) |
 | `js/stats.js` | Stats für die Level-Up-Auswahl |
 | `js/player.js` | Held: Bewegung, Angriffe, Fähigkeiten, XP-Kurve |
 | `js/enemies.js` | Gegnertypen, Mini-Bosse, Spawns |
 | `js/stages.js` | Ebenen, Boss Volghard, Pflanzen, Trolle, Steinsäulen, Steinboden (alle Ebenen-Werte) |
 | `js/projectiles.js` | Pfeile, Magiekugeln, Gegnerschüsse |
+| `js/records.js` | Spielstände (localStorage) |
 | `js/hud.js` | HUD und alle Bildschirme (Auswahl, Stat-Wahl, Pause, Tod) |
 | `js/main.js` | Spielschleife, Zustände, `GAME_VERSION` |
 
@@ -42,7 +43,12 @@ Der Launcher startet das Spiel bei `npm start` direkt aus `../Soulgrind-Game`. I
   Krieger: Schildblock 5 s / Wirbelschlag 6 s. Schütze: Hechtsprung (kurz unverwundbar) 5 s / Fächerschuss 4 s. Magier: Teleport zum Cursor (begrenzt) 10 s / Bannkreis (3 s Stun, wenig Schaden) 6 s.
 - **Level:** max. 20, XP-Bedarf steigt stark. Bei jedem Level-Up 1 von 3 Stats wählen.
 - **Stats:** max. Rang 5 pro Stat, max. 5 verschiedene Stats pro Run, 2 Rerolls pro Run.
-  Schaden +2 %, Rüstung -2 % Schaden, Max. Leben +7 %, Erholung +0,1 HP/s, Geschosstempo +5 %, Lauftempo +2 %, Mehr XP +2 %, Angriffstempo +2 %.
+  Schaden +3 %, Rüstung -3 % Schaden, Max. Leben +8 %, Erholung +0,1 HP/s, Geschosstempo +6 %, Lauftempo +3 %, Mehr XP +3 %, Angriffstempo +3 % (pro Rang).
+- **Ults (Taste R):** laden pro Kill auf, bei 100 % einsetzbar, je 5 s. Krieger: Wirbelsturm (Dauer-Wirbelwind, größere Reichweite, durch Gegner laufen, -80 % Schaden aus allen Quellen), 4 %/Kill. Schütze: Pfeilrausch (viel Lauf- und Angriffstempo, Pfeile durchbohren 5 Gegner), 3 %/Kill. Magier: Feuerbrand (Feuerzone am Mauszeiger, Dauerschaden), 4 %/Kill. Ult wird bei der Fähigkeitswahl erklärt.
+- **Gift (Dornenpflanzen):** 5 Schaden pro Treffer + 1 pro Sekunde für 5 s, stapelt sich nicht (neuer Treffer startet die Dauer neu).
+- **Skelette** ab 2:00 Rundenzeit seltener.
+- **Spielstände:** pro Klasse beste Zeit pro Ebene (grün = geschafft) und Kills, im Startmenü. Runs mit Dev-Modus zählen nicht.
+- **Developer-Modus:** F1 im Spiel, nur wenn das Spiel aus dem Ordner `Soulgrind-Game` läuft (nicht in installierten Versionen).
 - **Gegner:** Zombie, Fledermaus, Skelett-Schütze, Echse (selten, bleibt stehen, Warnlinie, ausweichbarer Strahl).
 - **Rundentimer:** je länger, desto mehr Gegner. Alle 3 Minuten ein Mini-Boss **ohne Ankündigung**, nur größer und stärker.
 - **Ebenen:** Ebene 1 (Wald) 5 Min., dann Timer-Stopp, Rest besiegen, Boss Volghard (Naturbaum, Dornen, wenige Pflanzen). Danach „Ebene geschafft“, gleicher Held in Ebene 2 (Steinebene: Trolle statt Zombies, animierte Steinsäulen mit Bremse und Bodyblock). Ebene 2 vorerst endlos.

@@ -154,7 +154,8 @@ class Enemy {
     d = Math.hypot(dx, dy) || 0.01;
     const minDist = this.r + p.r;
     const touching = d < minDist + 1;
-    if (d < minDist) {
+    const passThrough = p.ultActive && p.ult.id === 'storm'; // Krieger-Ult: Held läuft durch Gegner
+    if (d < minDist && !passThrough) {
       if (t.anchored) { // feststehende Gegner (Pflanzen) schieben stattdessen den Helden weg
         p.x = this.x + (dx / d) * minDist;
         p.y = this.y + (dy / d) * minDist;
@@ -183,7 +184,8 @@ class Enemy {
       const a = angle + (i - (shots - 1) / 2) * 0.25;
       game.projectiles.push({
         friendly: false, kind: r.kind || 'bullet', x: this.x, y: this.y,
-        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: 200 / sp, r: this.boss ? 3 : 2, dmg: this.bulletDmg,
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: (r.range || 200) / sp, r: this.boss ? 3 : 2,
+        dmg: r.fixedDmg || this.bulletDmg, poison: r.poison || null,
       });
     }
   }
@@ -245,12 +247,16 @@ class Enemy {
   }
 }
 
+// Skelette werden ab dieser Rundenzeit seltener (sonst schießen später zu viele gleichzeitig)
+const SKELETON_LATE = { from: 120, factor: 0.5 };
+
 // Wählt einen Gegnertyp passend zum Level (die Ebene kann Typen austauschen, z. B. Zombie > Troll)
-function pickEnemyType(level, stage) {
+function pickEnemyType(level, stage, runTime = 0) {
+  const skeletonMul = runTime >= SKELETON_LATE.from ? SKELETON_LATE.factor : 1;
   const weights = {
     zombie: 45,
     bat: 30 + level,
-    skeleton: level >= 2 ? 15 + level * 2 : 0,
+    skeleton: level >= 2 ? (15 + level * 2) * skeletonMul : 0,
     lizard: level >= 3 ? 5 + level * 0.5 : 0, // selten, erst ab Gegnerlevel 3
   };
   const total = Object.values(weights).reduce((a, b) => a + b, 0);
@@ -281,7 +287,7 @@ function spawnEnemy(game) {
   const pt = spawnPoint(game);
   if (!pt) return;
   const lvl = enemyLevel(game);
-  game.enemies.push(new Enemy(pickEnemyType(lvl, game.stageDef), lvl, pt.x, pt.y));
+  game.enemies.push(new Enemy(pickEnemyType(lvl, game.stageDef, game.runTime), lvl, pt.x, pt.y));
 }
 
 function spawnBoss(game, index) {

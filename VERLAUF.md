@@ -46,6 +46,15 @@ Neue wichtige Entscheidungen bitte unten ergänzen.
   - **Ebene 2 (Steinebene):** Steinboden, Trolle statt Zombies. Kleine Steinsäulen wachsen in 3 Stufen aus dem Boden (Spitze, fast oben, oben). Erst wenn sie ganz oben sind, blocken sie Held und Gegner und bremsen den Helden im Umkreis. Sie erscheinen nicht direkt am Helden und versinken nach einer Weile wieder. Gegner rutschen an Säulen vorbei. Ebene 2 läuft vorerst endlos, ein Boss für sie kommt später.
   - Alle Werte stehen in `js/stages.js`.
 
+- **v0.4.1:** Ebene 1 dauert 5 statt 10 Minuten.
+- **v0.5.0 (21.11.2026), Ults, Spielstände, Dev-Modus:**
+  - Volghard stärker (mehr Leben und Schaden, schnellere Salven). Mehr Pflanzen (bis 5, alle 7 s), die schneller und mit schnelleren Geschossen schießen und **vergiften**: 5 Schaden pro Treffer + 1 pro Sekunde für 5 s, nicht stapelbar. Gift-Schaden ist bewusst fest (wächst nicht mit dem Level).
+  - Skelette ab 2:00 halb so oft (Im-Kreis-Laufen ist das Gegenmittel, aber später schossen zu viele).
+  - Alle Prozent-Stats +1 % pro Rang (Erholung unverändert, weil kein Prozentwert).
+  - **Ults auf R**, alle 5 s lang, laden pro Kill (während die Ult läuft, lädt sie nicht). Krieger Wirbelsturm 4 %/Kill (läuft durch Gegner, -80 % Schaden auch gegen Gift), Schütze Pfeilrausch 3 %/Kill (+50 % Lauftempo, doppeltes Angriffstempo, Pfeile durchbohren 5), Magier Feuerbrand 4 %/Kill (Zone am Cursor). Erklärung samt Kills bis voll steht bei der Fähigkeitswahl.
+  - **Spielstände** pro Klasse auf den Klassenkarten: beste Zeit pro Ebene (grün = geschafft) und Kills, unten Kills gesamt. Gespeichert im localStorage des Spiels, bleibt über Updates erhalten.
+  - **Developer-Modus** (F1) nur aus dem Projektordner `Soulgrind-Game`, nicht in installierten Versionen. Kann Ebene springen, Timer vor Boss setzen, Level, Ult füllen, unverwundbar, alle Gegner töten. Dev-Runs zählen nicht für Spielstände.
+
 ## Offene Punkte und Ideen
 - **Boss für Ebene 2** fehlt noch (der Nutzer liefert die Idee).
 - **Erholung** (+0,1 Leben/s pro Rang, wie vom Nutzer vorgegeben) ist sehr schwach, weil es zusätzlich eine Grund-Regeneration gibt (2 % Leben/s nach 4 s ohne Treffer). Noch nicht entschieden, ob die Grund-Regeneration wegfällt oder Erholung stärker wird.
