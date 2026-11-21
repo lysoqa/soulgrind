@@ -5,7 +5,7 @@
 // duration = Sekunden bis zum Boss (null = endlos), levelBonus = Gegner so viele Level stärker,
 // replace = Gegnertyp austauschen, pillars = Steinsäulen erscheinen
 const STAGES = [
-  { name: 'Wald', ground: 'grass', duration: 600, boss: 'volghard', levelBonus: 0, replace: {}, pillars: false },
+  { name: 'Wald', ground: 'grass', duration: 300, boss: 'volghard', levelBonus: 0, replace: {}, pillars: false },
   { name: 'Steinebene', ground: 'stone', duration: null, boss: null, levelBonus: 2, replace: { zombie: 'troll' }, pillars: true },
 ];
 

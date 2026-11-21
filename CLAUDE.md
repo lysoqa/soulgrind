@@ -45,7 +45,7 @@ Der Launcher startet das Spiel bei `npm start` direkt aus `../Soulgrind-Game`. I
   Schaden +2 %, Rüstung -2 % Schaden, Max. Leben +7 %, Erholung +0,1 HP/s, Geschosstempo +5 %, Lauftempo +2 %, Mehr XP +2 %, Angriffstempo +2 %.
 - **Gegner:** Zombie, Fledermaus, Skelett-Schütze, Echse (selten, bleibt stehen, Warnlinie, ausweichbarer Strahl).
 - **Rundentimer:** je länger, desto mehr Gegner. Alle 3 Minuten ein Mini-Boss **ohne Ankündigung**, nur größer und stärker.
-- **Ebenen:** Ebene 1 (Wald) 10 Min., dann Timer-Stopp, Rest besiegen, Boss Volghard (Naturbaum, Dornen, wenige Pflanzen). Danach „Ebene geschafft“, gleicher Held in Ebene 2 (Steinebene: Trolle statt Zombies, animierte Steinsäulen mit Bremse und Bodyblock). Ebene 2 vorerst endlos.
+- **Ebenen:** Ebene 1 (Wald) 5 Min., dann Timer-Stopp, Rest besiegen, Boss Volghard (Naturbaum, Dornen, wenige Pflanzen). Danach „Ebene geschafft“, gleicher Held in Ebene 2 (Steinebene: Trolle statt Zombies, animierte Steinsäulen mit Bremse und Bodyblock). Ebene 2 vorerst endlos.
 - **Auto-Schuss:** Q schaltet an/aus (alle Klassen, Ziel = Maus).
 - ESC-Menü: Weiter / Run abbrechen.
 
