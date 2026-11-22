@@ -9,7 +9,7 @@ const ENEMY_TYPES = {
   },
   skeleton: {
     name: 'Skelett-Schütze', sprites: ['skeleton'], hp: 35, speed: 26, contact: 0, xp: 8, r: 5, blood: '#e8e4d4',
-    ranged: { dist: 95, cd: 1.9, speed: 85, dmg: 9 },
+    ranged: { dist: 95, cd: 1.9, speed: 85, dmg: 9, retreat: 0.5 }, // retreat: weicht nur mit 50 % Tempo zurück
   },
   lizard: {
     name: 'Echse', sprites: ['lizard'], hp: 45, speed: 22, contact: 0, xp: 10, r: 5, blood: '#5fae3e',
@@ -73,6 +73,13 @@ class Enemy {
     this.beamAngle = 0;
     this.beamHit = false;
     this.stunT = 0;
+    this.frozenT = 0; // eingefroren (Eispfeile): wie betäubt, aber blau
+    this.slowT = 0; // verlangsamt (Rankenpfad, Sturmwalze)
+    this.slowMul = 1;
+    this.burnT = 0; // brennt (Feuerspur)
+    this.burnTick = 0;
+    this.burnEvery = 0.5;
+    this.burnDmg = 0;
     this.strafe = Math.random() < 0.5 ? 1 : -1;
     this.contactT = 0;
     this.flash = 0;
@@ -91,6 +98,35 @@ class Enemy {
     let mx = ux, my = uy;
     this.contactT -= dt;
     this.flash -= dt;
+    this.frozenT = Math.max(0, this.frozenT - dt);
+    if (this.slowT > 0) this.slowT -= dt;
+    else this.slowMul = 1;
+
+    // Brennen: Schaden in festen Abständen, solange es brennt
+    if (this.burnT > 0) {
+      this.burnT -= dt;
+      this.burnTick -= dt;
+      if (Math.random() < dt * 10) game.fx.particle(this.x, this.y - 3, Math.random() < 0.5 ? '#ff9a3c' : '#ffd34a', 0.4, 10);
+      if (this.burnTick <= 0) {
+        this.burnTick = this.burnEvery;
+        game.hitEnemy(this, Math.max(1, Math.round(this.burnDmg)), 0, 0);
+        if (this.dead) return;
+      }
+    }
+
+    if (t.straight) {
+      // Schwarm-Fledermaus: fliegt stur geradeaus und verschwindet danach
+      this.x += this.dir.x * this.speed * dt;
+      this.y += this.dir.y * this.speed * dt;
+      this.facing = this.dir.x < 0 ? -1 : 1;
+      if ((this.flyT -= dt) <= 0) { this.dead = true; this.silent = true; return; }
+      if (this.stunT > 0) this.stunT -= dt;
+      else if (Math.hypot(p.x - this.x, p.y - this.y) < this.r + p.r && this.contactT <= 0) {
+        p.takeDamage(this.contact, game);
+        this.contactT = 99; // jede Fledermaus trifft höchstens einmal
+      }
+      return;
+    }
 
     if (this.stunT > 0) {
       // betäubt: keine Bewegung, kein Angriff, Strahl wird abgebrochen
@@ -128,7 +164,7 @@ class Enemy {
       mx = m.x; my = m.y;
     } else if (t.ranged) {
       if (d > t.ranged.dist + 15) { mx = ux; my = uy; }
-      else if (d < t.ranged.dist - 15) { mx = -ux; my = -uy; }
+      else if (d < t.ranged.dist - 15) { const k = t.ranged.retreat || 1; mx = -ux * k; my = -uy * k; }
       else { mx = -uy * this.strafe * 0.7; my = ux * this.strafe * 0.7; }
       if (Math.random() < dt * 0.3) this.strafe *= -1;
       this.fireT -= dt;
@@ -144,8 +180,9 @@ class Enemy {
       mx /= l; my /= l;
     }
 
-    this.x += mx * this.speed * dt;
-    this.y += my * this.speed * dt;
+    const speed = this.speed * (this.slowT > 0 ? this.slowMul : 1);
+    this.x += mx * speed * dt;
+    this.y += my * speed * dt;
     if (this.stunT <= 0 && !this.beamState) this.facing = dx < 0 ? -1 : 1;
 
     // Gegner dürfen nicht in den Helden hineinlaufen
@@ -225,10 +262,21 @@ class Enemy {
     }
     // Volghard zittert kurz, bevor er Dornen schießt
     const shakeX = this.windupT > 0 ? Math.round(Math.sin(game.time * 60)) : 0;
-    drawSprite(ctx, spr, sx + shakeX, sy + hover, { flip: this.facing < 0, white: this.flash > 0, scale: this.scale });
+    const look = { flip: this.facing < 0, white: this.flash > 0, scale: this.scale };
+    drawSprite(ctx, spr, sx + shakeX, sy + hover, look);
+    // Brennen: flackert rot/orange/gelb · Eingefroren: blau · Verlangsamt: leicht grün
+    if (this.burnT > 0 && this.flash <= 0) {
+      drawTint(ctx, spr, sx + shakeX, sy + hover, look, ['#ff3a1a', '#ff9a3c', '#ffd34a'][Math.floor(game.time * 10 + this.seed) % 3], 0.6);
+    } else if (this.frozenT > 0 && this.flash <= 0) {
+      drawTint(ctx, spr, sx + shakeX, sy + hover, look, '#7fd4ff', 0.6);
+    } else if (this.slowT > 0 && this.slowMul < 1 && this.flash <= 0) {
+      drawTint(ctx, spr, sx + shakeX, sy + hover, look, '#62a050', 0.35);
+    }
 
-    // Betäubung: kreisende Sterne über dem Kopf
-    if (this.stunT > 0) {
+    if (this.frozenT > 0) {
+      drawSprite(ctx, SPR.snow, sx, sy + hover - half - 5);
+    } else if (this.stunT > 0) {
+      // Betäubung: kreisende Sterne über dem Kopf
       ctx.fillStyle = '#ffd34a';
       for (let i = 0; i < 3; i++) {
         const a = game.time * 6 + (i * Math.PI * 2) / 3;
@@ -236,7 +284,7 @@ class Enemy {
       }
     }
 
-    if (this.hp < this.maxHp && !this.bossBar) {
+    if (this.hp < this.maxHp && !this.bossBar && this.maxHp > 1) {
       const w = 12 * this.scale;
       const y = sy + hover - half - 4;
       ctx.fillStyle = '#1a1420';

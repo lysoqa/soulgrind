@@ -41,5 +41,18 @@ const Records = {
   totalKills() {
     return Object.values(this.data).reduce((sum, r) => sum + (r.kills || 0), 0);
   },
+
+  // Gold gehört allen Klassen zusammen (für spätere Upgrades)
+  GOLD_KEY: 'soulgrind.gold',
+  gold: 0,
+  loadGold() {
+    try { this.gold = Number(localStorage.getItem(this.GOLD_KEY)) || 0; } catch (e) { this.gold = 0; }
+  },
+  addGold(n) {
+    if (n <= 0) return;
+    this.gold += n;
+    try { localStorage.setItem(this.GOLD_KEY, String(this.gold)); } catch (e) { /* egal */ }
+  },
 };
 Records.load();
+Records.loadGold();

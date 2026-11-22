@@ -32,9 +32,9 @@ const PILLAR = {
   interval: [4, 7], // neue Säule alle 4 bis 7 Sekunden
   max: 7, // höchstens so viele gleichzeitig
   life: 18, // Sekunden, bis die Säule wieder versinkt
-  rise: 0.4, // Sekunden pro Animationsstufe (Spitze, fast oben, oben)
+  rise: 1.0, // Sekunden pro Animationsstufe (Spitze, fast oben, oben)
   minDist: 45, // nie näher am Helden
-  maxDist: 160,
+  viewMargin: 30, // erscheinen im Sichtfeld plus so viele Pixel drumherum
   spacing: 45, // Mindestabstand zwischen zwei Säulen
   radius: 4, // Körpergröße (blockt Held und Gegner)
   slowRadius: 24, // Umkreis, in dem der Held verlangsamt wird
@@ -315,11 +315,12 @@ function updatePillars(dt, game) {
   if (game.pillars.length >= PILLAR.max) return;
 
   const p = game.player;
-  for (let tries = 0; tries < 12; tries++) {
-    const ang = Math.random() * Math.PI * 2;
-    const dist = PILLAR.minDist + Math.random() * (PILLAR.maxDist - PILLAR.minDist);
-    const x = p.x + Math.cos(ang) * dist;
-    const y = p.y + Math.sin(ang) * dist;
+  const m = PILLAR.viewMargin;
+  for (let tries = 0; tries < 16; tries++) {
+    // irgendwo im Bild (plus etwas Rand), damit man sie herauswachsen sieht
+    const x = p.x - W / 2 - m + Math.random() * (W + 2 * m);
+    const y = p.y - H / 2 - m + Math.random() * (H + 2 * m);
+    if (Math.hypot(x - p.x, y - p.y) < PILLAR.minDist) continue;
     if (x < 20 || y < 20 || x > WORLD - 20 || y > WORLD - 20) continue;
     if (game.pillars.some((o) => Math.hypot(o.x - x, o.y - y) < PILLAR.spacing)) continue;
     game.pillars.push({ x, y, age: 0, draw: drawPillar });

@@ -5,8 +5,11 @@ function updateProjectiles(dt, game) {
     p.y += p.vy * dt;
     p.life -= dt;
 
-    if (p.kind === 'orb' && Math.random() < 0.7) {
+    if (p.kind === 'orb' && Math.random() < (p.small ? 0.3 : 0.7)) {
       game.fx.particle(p.x, p.y, Math.random() < 0.5 ? '#b07cff' : '#e0ccff', 0.3, 10);
+    }
+    if (p.kind === 'tornado' && Math.random() < 0.8) {
+      game.fx.particle(p.x + (Math.random() - 0.5) * p.r * 2, p.y + p.r * 0.6, '#9fb0c2', 0.4, 15);
     }
 
     if (p.friendly) {
@@ -17,6 +20,7 @@ function updateProjectiles(dt, game) {
         if (p.aoe) {
           explode(p, game, e);
         } else {
+          applyHitEffects(e, p);
           game.hitEnemy(e, p.dmg, ang, p.knockback);
           p.hit.add(e);
           if (--p.pierce <= 0) p.dead = true;
@@ -26,7 +30,11 @@ function updateProjectiles(dt, game) {
       if (!p.dead && p.life <= 0 && p.aoe) explode(p, game, null);
     } else {
       const pl = game.player;
-      if (Math.hypot(pl.x - p.x, pl.y - p.y) < pl.r + p.r) {
+      const dist = Math.hypot(pl.x - p.x, pl.y - p.y);
+      const reflect = pl.reflectRadius();
+      if (reflect && dist < reflect + p.r) {
+        reflectProjectile(p, pl, game);
+      } else if (dist < pl.r + p.r && !pl.projectileImmune) {
         const hit = pl.takeDamage(p.dmg, game);
         if (hit && p.poison) pl.poisonT = POISON.duration; // Gift startet neu, stapelt sich nicht
         p.dead = true;
@@ -35,6 +43,39 @@ function updateProjectiles(dt, game) {
     if (p.life <= 0) p.dead = true;
   }
   game.projectiles = game.projectiles.filter((p) => !p.dead);
+}
+
+// Eispfeil friert ein, Sturmwalze verlangsamt
+function applyHitEffects(e, p) {
+  if (p.freeze) {
+    const t = e.boss ? p.freeze / 2 : p.freeze;
+    e.stunT = Math.max(e.stunT, t);
+    e.frozenT = Math.max(e.frozenT, t);
+    e.beamState = null;
+  }
+  if (p.slow) {
+    e.slowT = Math.max(e.slowT, p.slowTime);
+    e.slowMul = Math.min(e.slowMul, p.slow);
+  }
+}
+
+// Krieger: Schildblock oder Wirbelschlag wirft ein gegnerisches Geschoss zurück
+function reflectProjectile(p, pl, game) {
+  const sp = Math.hypot(p.vx, p.vy) * 1.3;
+  // zurück in die Richtung, aus der es kam
+  const a = Math.atan2(-p.vy, -p.vx);
+  p.friendly = true;
+  p.reflected = true;
+  p.vx = Math.cos(a) * sp;
+  p.vy = Math.sin(a) * sp;
+  p.life = 1.6;
+  p.dmg = Math.round(pl.rollDamage() * pl.reflectFactor());
+  p.pierce = 1;
+  p.hit = new Set();
+  p.aoe = 0;
+  p.knockback = 4;
+  p.poison = null;
+  game.fx.burst(p.x, p.y, '#7fd4ff', 5);
 }
 
 // Magiekugel: voller Schaden am Ziel, weniger Schaden an Gegnern im Umkreis
@@ -54,8 +95,27 @@ function drawProjectiles(ctx, cam, game) {
   for (const p of game.projectiles) {
     const sx = Math.round(p.x - cam.x);
     const sy = Math.round(p.y - cam.y);
-    if (p.kind === 'arrow') {
-      drawRotated(ctx, SPR.arrow, sx, sy, Math.atan2(p.vy, p.vx), -4);
+    if (p.reflected) {
+      // zurückgeworfenes Geschoss: leuchtet blau
+      ctx.fillStyle = '#1a1420';
+      ctx.fillRect(sx - 2, sy - 3, 5, 7);
+      ctx.fillRect(sx - 3, sy - 2, 7, 5);
+      ctx.fillStyle = '#7fd4ff';
+      ctx.fillRect(sx - 2, sy - 2, 5, 5);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(sx - 1, sy - 1, 2, 2);
+    } else if (p.kind === 'arrow') {
+      drawRotated(ctx, p.freeze ? SPR.iceArrow : SPR.arrow, sx, sy, Math.atan2(p.vy, p.vx), -4);
+    } else if (p.kind === 'tornado') {
+      const wob = Math.round(Math.sin(game.time * 25) * 1.5);
+      ctx.fillStyle = 'rgba(0,0,0,0.25)';
+      ctx.fillRect(sx - 6, sy + 8, 13, 2);
+      drawSprite(ctx, SPR.tornado, sx + wob, sy - 1, { scale: 2, flip: Math.floor(game.time * 12) % 2 === 0 });
+    } else if (p.kind === 'orb' && p.small) {
+      ctx.fillStyle = 'rgba(176,124,255,0.5)';
+      ctx.fillRect(sx - 2, sy - 2, 5, 5);
+      ctx.fillStyle = '#e0ccff';
+      ctx.fillRect(sx - 1, sy - 1, 3, 3);
     } else if (p.kind === 'thorn') {
       drawRotated(ctx, SPR.thorn, sx, sy, Math.atan2(p.vy, p.vx), -3);
     } else if (p.kind === 'seed') {

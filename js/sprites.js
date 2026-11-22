@@ -180,6 +180,29 @@ function drawSprite(ctx, s, x, y, { flip = false, white = false, scale = 1 } = {
   ctx.drawImage(img, Math.round(x - w / 2), Math.round(y - h / 2), w, h);
 }
 
+// Färbt ein Sprite einfarbig ein und legt es halb durchsichtig darüber (z. B. brennend, eingefroren).
+// Die eingefärbten Bilder werden pro Farbe einmal erzeugt und gemerkt.
+function drawTint(ctx, s, x, y, { flip = false, scale = 1 } = {}, color, alpha) {
+  if (!s.tints) s.tints = {};
+  const key = color + (flip ? 'f' : '');
+  if (!s.tints[key]) {
+    const c = document.createElement('canvas');
+    c.width = s.w;
+    c.height = s.h;
+    const g = c.getContext('2d');
+    g.drawImage(flip ? s.flip : s.img, 0, 0);
+    g.globalCompositeOperation = 'source-in';
+    g.fillStyle = color;
+    g.fillRect(0, 0, s.w, s.h);
+    s.tints[key] = c;
+  }
+  const w = s.w * scale;
+  const h = s.h * scale;
+  ctx.globalAlpha = alpha;
+  ctx.drawImage(s.tints[key], Math.round(x - w / 2), Math.round(y - h / 2), w, h);
+  ctx.globalAlpha = 1;
+}
+
 // Zeichnet ein Sprite gedreht um (x, y). ox = Abstand vom Drehpunkt entlang der Blickrichtung.
 function drawRotated(ctx, s, x, y, angle, ox = 0) {
   ctx.save();

@@ -57,7 +57,17 @@ Neue wichtige Entscheidungen bitte unten ergänzen.
 
 - **v0.5.1 (Hotfix):** Krieger-Ult Wirbelsturm gibt zusätzlich +60 % Lauftempo.
 
+- **v0.6.0 (22.11.2026), Menü, Gold, Upgrades:** (Patch Notes bewusst ohne Spoiler, Wunsch des Nutzers)
+  - Hauptmenü mit Spielen / Upgrades (Coming Soon) / Erfolge (Coming Soon) / Optionen. In den Optionen lässt sich die Auto-Schuss-Taste ändern (Standard Q). Nach Tod oder Abbruch geht es zurück ins Hauptmenü.
+  - **Gold** (für die späteren Upgrades im Menü): 50 % Chance auf 1 Gold pro Gegner, Mini-Boss 10, Volghard 25. Wird mit Magnet eingesammelt. Erst beim Schaffen einer Ebene gesichert. Stirbt man in Ebene 2, bleibt nur das Gold aus Ebene 1. Pflanzen geben bewusst kein Gold (Volghard macht ständig neue). Dev-Runs speichern kein Gold.
+  - **Herzen:** 8 % pro Gegner (nicht von Bossen), +20 Leben, liegen 15 s.
+  - **Fledermaus-Schwarm:** ab 45 s alle 25 bis 45 s, 6 bis 9 Stück, fliegen geradeaus durch, 1 Treffer, 30 % XP, wenig Kontaktschaden (jede höchstens einmal).
+  - **Krieger-Balance gegen Skelette:** Skelette weichen mit 50 % Tempo zurück. Schildblock und Wirbelschlag werfen Geschosse zurück (Schaden wie ein Schwerthieb).
+  - **Säulen:** erscheinen im Sichtfeld, 1 s pro Animationsstufe.
+  - **Upgrade-Wahl nach Ebene 1:** Fähigkeit ODER Ult. Spiegelschild (2 s, doppelter Rückwurfschaden, unverwundbar), Sturmwalze (Tornado zum Cursor, verlangsamt), Feuersturm (+20 % Tempo, Feuerspur mit Brand), Rankenpfad (8 s Bremsfeld für Gegner), Frostfächer (Fächer + nächste 3 Schüsse frieren 3 s ein), Windläufer (Geschosse treffen nicht, schneller schießen), Arkansprung (7,5 s CD, 8 Kugeln bei Start und Ziel), Doppelbann (zweiter Bann am Cursor), Meteor (8-facher Schaden in der Feuerzone, auch an Bossen).
+
 ## Offene Punkte und Ideen
+- **Menü-Upgrades für Gold** und **Erfolge** sind als „Coming Soon“ im Hauptmenü, noch nicht gebaut.
 - **Boss für Ebene 2** fehlt noch (der Nutzer liefert die Idee).
 - **Erholung** (+0,1 Leben/s pro Rang, wie vom Nutzer vorgegeben) ist sehr schwach, weil es zusätzlich eine Grund-Regeneration gibt (2 % Leben/s nach 4 s ohne Treffer). Noch nicht entschieden, ob die Grund-Regeneration wegfällt oder Erholung stärker wird.
 - Als Nächstes vorgeschlagen: ein paar Runden spielen und Balance notieren, dann **Prestige-Punkte**, danach **Loot**.

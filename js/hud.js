@@ -39,6 +39,10 @@ function drawHUD(ctx, game) {
   // Oben: Klasse, Kills, Rundenzeit
   Font.draw(ctx, p.cls.name, 6, 6, { color: '#f1ede2' });
   Font.draw(ctx, `Kills ${p.kills}`, 6, 14, { color: '#b9b4a6' });
+  // Gold: diese Ebene (unsicher) und schon gesichertes
+  drawSprite(ctx, SPR.coin, W - 9, 25);
+  Font.draw(ctx, `${game.runGold}`, W - 14, 23, { align: 'right', color: '#ffd34a' });
+  if (game.bankedGold > 0) Font.draw(ctx, `${game.bankedGold} sicher`, W - 6, 31, { align: 'right', color: '#8b8a95', shadow: null });
   const frozen = game.phase !== 'waves';
   Font.draw(ctx, fmtTime(game.runTime), W / 2, 5, { align: 'center', scale: 2, color: frozen ? '#ffd34a' : '#f1ede2' });
   Font.draw(ctx, `Ebene ${game.stage + 1} · ${game.stageDef.name}`, W - 6, 6, { align: 'right', color: '#b9b4a6' });
@@ -58,7 +62,7 @@ function drawHUD(ctx, game) {
     drawBar(ctx, bx, 33, bw, 5, boss.hp / boss.maxHp, '#4f9a3a');
   }
 
-  if (game.autoFire) Font.draw(ctx, 'Auto (Q)', x - 5, H - 27, { align: 'right', color: '#7fe07f' });
+  if (game.autoFire) Font.draw(ctx, `Auto (${Settings.keyLabel(Settings.autoFireKey)})`, x - 5, H - 27, { align: 'right', color: '#7fe07f' });
 
   // Gewählte Stats links
   Object.entries(p.stats).forEach(([id, rank], i) => {
@@ -77,7 +81,7 @@ function drawHUD(ctx, game) {
     ctx.fillRect(bx, by, 14, 14);
     drawSprite(ctx, ABILITY_ICONS[p.ability.id], bx + 7, by + 7);
     if (p.abilityCd > 0 && !p.abilityActive) {
-      const frac = p.abilityCd / p.ability.cooldown;
+      const frac = p.abilityCd / p.abilityCooldown;
       ctx.fillStyle = 'rgba(10,8,14,0.7)';
       ctx.fillRect(bx, by, 14, Math.ceil(14 * frac));
       Font.draw(ctx, Math.ceil(p.abilityCd), bx + 7, by + 5, { align: 'center' });
@@ -251,10 +255,11 @@ function drawSelect(ctx, game) {
     Font.draw(ctx, `Kills ${rec.kills}`, r.x + 8, y + 120, { color: '#b9b4a6', shadow: null });
   });
 
-  const hint = game.hoverCard >= 0 ? CLASSES[CLASS_ORDER[game.hoverCard]].hint : 'WASD laufen · Maus zielen · Linksklick angreifen · Q Auto · R Ult';
+  const hint = game.hoverCard >= 0 ? CLASSES[CLASS_ORDER[game.hoverCard]].hint : `WASD laufen · Maus zielen · Linksklick angreifen · ${Settings.keyLabel(Settings.autoFireKey)} Auto · R Ult`;
   Font.draw(ctx, hint, W / 2, 188, { align: 'center', color: '#b9b4a6' });
-  Font.draw(ctx, 'Klicken oder 1 / 2 / 3 drücken', W / 2, 199, { align: 'center', color: '#5d5868', shadow: null });
+  Font.draw(ctx, 'Klicken oder 1 / 2 / 3 drücken · ESC zurück', W / 2, 199, { align: 'center', color: '#5d5868', shadow: null });
   Font.draw(ctx, `Kills gesamt ${Records.totalKills()}`, 4, H - 8, { color: '#5d5868', shadow: null });
+  drawBackButton(ctx);
   Font.draw(ctx, `v${GAME_VERSION}${DEV_MODE ? ' dev' : ''}`, W - 4, H - 8, { align: 'right', color: '#3a3046', shadow: null });
 }
 
@@ -268,6 +273,16 @@ function abilityRects(n) {
 
 function backRect() {
   return { x: 8, y: 8, w: 52, h: 13 };
+}
+
+function drawBackButton(ctx) {
+  const b = backRect();
+  const overBack = inRect(Input.mouse, b);
+  ctx.fillStyle = overBack ? '#2a2038' : '#1a1422';
+  ctx.fillRect(b.x, b.y, b.w, b.h);
+  ctx.strokeStyle = '#3a3046';
+  ctx.strokeRect(b.x + 0.5, b.y + 0.5, b.w - 1, b.h - 1);
+  Font.draw(ctx, '< Zurück', b.x + b.w / 2, b.y + 4, { align: 'center', shadow: null, color: overBack ? '#f1ede2' : '#b9b4a6' });
 }
 
 function drawAbilitySelect(ctx, game) {
@@ -303,13 +318,7 @@ function drawAbilitySelect(ctx, game) {
     Font.draw(ctx, i + 1, r.x + 4, y + 4, { color: '#5d5868', shadow: null });
   });
 
-  const b = backRect();
-  const overBack = inRect(Input.mouse, b);
-  ctx.fillStyle = overBack ? '#2a2038' : '#1a1422';
-  ctx.fillRect(b.x, b.y, b.w, b.h);
-  ctx.strokeStyle = '#3a3046';
-  ctx.strokeRect(b.x + 0.5, b.y + 0.5, b.w - 1, b.h - 1);
-  Font.draw(ctx, '< Zurück', b.x + b.w / 2, b.y + 4, { align: 'center', shadow: null, color: overBack ? '#f1ede2' : '#b9b4a6' });
+  drawBackButton(ctx);
 
   // Ult der Klasse (immer dabei, Taste R)
   const u = cls.ult;
@@ -341,7 +350,9 @@ function drawDead(ctx, game) {
   if (s.newBest) Font.draw(ctx, 'Neue Bestzeit!', W / 2, 140, { align: 'center', color: '#ffd34a' });
   else if (s.dev) Font.draw(ctx, 'Dev-Modus benutzt · nicht gespeichert', W / 2, 140, { align: 'center', color: '#8b3dff' });
   Font.draw(ctx, `Kills ${s.kills} · Bosse ${s.bosses}`, W / 2, 106, { align: 'center', color: '#b9b4a6' });
-  Font.draw(ctx, 'Dein Held ist für immer verloren.', W / 2, 126, { align: 'center', color: '#8b8a95' });
+  Font.draw(ctx, 'Dein Held ist für immer verloren.', W / 2, 118, { align: 'center', color: '#8b8a95' });
+  const goldLine = s.goldKept > 0 ? `${s.goldKept} Gold gesichert · ${s.goldLost} Gold verloren` : `${s.goldLost} Gold verloren`;
+  Font.draw(ctx, goldLine, W / 2, 128, { align: 'center', color: '#c99a20' });
   if (game.deadT > 1.2 && Math.floor(game.time * 2) % 2 === 0) {
     Font.draw(ctx, 'Klicken für einen neuen Helden', W / 2, 156, { align: 'center', color: '#ffd34a' });
   }
@@ -396,23 +407,134 @@ function drawDevMenu(ctx, game) {
   Font.draw(ctx, 'Runs mit Dev-Modus zählen nicht für die Spielstände.', W / 2, 190, { align: 'center', color: '#5d5868', shadow: null });
 }
 
+function upgradeRects(n) {
+  const cw = 164, ch = 104, gap = 12;
+  const x0 = Math.round((W - (cw * n + gap * (n - 1))) / 2);
+  return Array.from({ length: n }, (_, i) => ({ x: x0 + i * (cw + gap), y: 72, w: cw, h: ch }));
+}
+
 function drawStageClear(ctx, game) {
   const s = game.lastClear;
   const p = game.player;
   const next = STAGES[game.stage + 1];
-  ctx.fillStyle = 'rgba(8,14,8,0.72)';
+  ctx.fillStyle = 'rgba(8,14,8,0.82)';
   ctx.fillRect(0, 0, W, H);
-  Font.draw(ctx, `Ebene ${s.stage} geschafft!`, W / 2, 40, { align: 'center', scale: 3, color: '#9be05a', shadow: '#1a3010' });
-  Font.draw(ctx, `${s.boss} ist besiegt.`, W / 2, 70, { align: 'center', scale: 2 });
-  Font.draw(ctx, `${p.cls.name} · Level ${p.level} · Kills ${p.kills}`, W / 2, 92, { align: 'center', color: '#b9b4a6' });
-  if (s.newBest) Font.draw(ctx, 'Neuer Rekord!', W / 2, 102, { align: 'center', color: '#ffd34a' });
-  if (next) {
-    Font.draw(ctx, `Als Nächstes: Ebene ${s.stage + 1} · ${next.name}`, W / 2, 116, { align: 'center', color: '#f1ede2' });
-    Font.draw(ctx, 'Dein Leben wird aufgefüllt.', W / 2, 126, { align: 'center', color: '#8b8a95' });
-    if (game.clearT > 1.2 && Math.floor(game.time * 2) % 2 === 0) {
-      Font.draw(ctx, 'Klicken zum Weitergehen', W / 2, 156, { align: 'center', color: '#ffd34a' });
-    }
+  Font.draw(ctx, `Ebene ${s.stage} geschafft!`, W / 2, 10, { align: 'center', scale: 3, color: '#9be05a', shadow: '#1a3010' });
+  if (s.boss) Font.draw(ctx, `${s.boss} ist besiegt.${s.newBest ? ' Neuer Rekord!' : ''}`, W / 2, 33, { align: 'center', color: '#f1ede2' });
+  Font.draw(ctx, `${p.cls.name} · Level ${p.level} · Kills ${p.kills}`, W / 2, 43, { align: 'center', color: '#b9b4a6' });
+  drawSprite(ctx, SPR.coin, W / 2 - 46, 55);
+  Font.draw(ctx, `+${s.gold} Gold gesichert`, W / 2 - 40, 53, { color: '#ffd34a' });
+  if (!next) return;
+
+  const ready = game.clearT > 1.2;
+  const opts = s.options;
+  if (opts.length) {
+    Font.draw(ctx, 'Wähle ein Upgrade · Klicken oder 1 / 2', W / 2, 63, { align: 'center', color: ready ? '#ffd34a' : '#5d5868' });
+    upgradeRects(opts.length).forEach((r, i) => {
+      const o = opts[i];
+      const hover = ready && i === game.upgradeHover;
+      const y = r.y - (hover ? 2 : 0);
+      ctx.fillStyle = '#000';
+      ctx.fillRect(r.x + 3, y + 3, r.w, r.h);
+      ctx.fillStyle = hover ? '#241c30' : '#1a1422';
+      ctx.fillRect(r.x, y, r.w, r.h);
+      ctx.strokeStyle = hover ? '#ffd34a' : o.kind === 'ult' ? '#8a6a20' : '#3a3046';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(r.x + 0.5, y + 0.5, r.w - 1, r.h - 1);
+      Font.draw(ctx, `${o.kind === 'ult' ? 'Ult' : 'Fähigkeit'}: ${o.base.name}`, r.x + r.w / 2, y + 5, { align: 'center', color: '#8b8a95', shadow: null });
+      drawSprite(ctx, ABILITY_ICONS[o.base.id], r.x + r.w / 2, y + 23, { scale: 2 });
+      Font.draw(ctx, o.up.name, r.x + r.w / 2, y + 37, { align: 'center', scale: 2, color: '#ffd34a' });
+      Font.wrap(o.up.desc, r.w - 14).forEach((line, j) => {
+        Font.draw(ctx, line, r.x + r.w / 2, y + 53 + j * 8, { align: 'center', color: '#b9b4a6', shadow: null });
+      });
+      Font.draw(ctx, i + 1, r.x + 4, y + 4, { color: '#5d5868', shadow: null });
+    });
+  } else if (ready && Math.floor(game.time * 2) % 2 === 0) {
+    Font.draw(ctx, 'Klicken zum Weitergehen', W / 2, 120, { align: 'center', color: '#ffd34a' });
   }
+  Font.draw(ctx, `Als Nächstes: Ebene ${s.stage + 1} · ${next.name} · Leben wird aufgefüllt`, W / 2, 190, { align: 'center', color: '#8b8a95' });
+}
+
+// ---------- Hauptmenü und Optionen ----------
+
+function menuButtons() {
+  const w = 150, h = 18, x = (W - w) / 2;
+  return [
+    { id: 'play', label: 'Spielen', x, y: 78, w, h },
+    { id: 'upgrades', label: 'Upgrades', soon: true, x, y: 102, w, h },
+    { id: 'achievements', label: 'Erfolge', soon: true, x, y: 126, w, h },
+    { id: 'options', label: 'Optionen', x, y: 150, w, h },
+  ];
+}
+
+function drawMenuBackground(ctx, game) {
+  ctx.fillStyle = '#100c16';
+  ctx.fillRect(0, 0, W, H);
+  for (let i = 0; i < 40; i++) {
+    ctx.fillStyle = i % 3 ? '#1c1626' : '#2a2038';
+    ctx.fillRect((i * 97 + Math.floor(game.time * (4 + (i % 5)))) % W, (i * 53) % H, 1, 1);
+  }
+}
+
+function drawMenu(ctx, game) {
+  drawMenuBackground(ctx, game);
+  Font.draw(ctx, 'Soulgrind', W / 2, 18, { align: 'center', scale: 5, color: '#8b3dff', shadow: '#2a1050' });
+  Font.draw(ctx, 'Grinden · Leveln · Sterben · Neu anfangen', W / 2, 52, { align: 'center', color: '#8b8a95' });
+
+  menuButtons().forEach((b, i) => {
+    const hover = i === game.menuHover && !b.soon;
+    ctx.fillStyle = '#000';
+    ctx.fillRect(b.x + 2, b.y + 2, b.w, b.h);
+    ctx.fillStyle = b.soon ? '#151019' : hover ? '#3a2a55' : '#1a1422';
+    ctx.fillRect(b.x, b.y, b.w, b.h);
+    ctx.strokeStyle = b.soon ? '#2a2230' : hover ? '#f1ede2' : '#8b3dff';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(b.x + 0.5, b.y + 0.5, b.w - 1, b.h - 1);
+    if (b.soon) {
+      Font.draw(ctx, b.label, b.x + 10, b.y + 7, { color: '#5d5868', shadow: null });
+      Font.draw(ctx, 'Coming Soon...', b.x + b.w - 8, b.y + 7, { align: 'right', color: '#5d5868', shadow: null });
+    } else {
+      Font.draw(ctx, b.label, W / 2, b.y + 5, { align: 'center', scale: 2, color: hover ? '#ffffff' : '#f1ede2' });
+    }
+  });
+
+  drawSprite(ctx, SPR.coin, 9, H - 13);
+  Font.draw(ctx, `${Records.gold} Gold`, 15, H - 15, { color: '#ffd34a' });
+  Font.draw(ctx, `Kills gesamt ${Records.totalKills()}`, 6, H - 7, { color: '#5d5868', shadow: null });
+  Font.draw(ctx, `v${GAME_VERSION}${DEV_MODE ? ' dev' : ''}`, W - 4, H - 8, { align: 'right', color: '#3a3046', shadow: null });
+}
+
+function optionsButtons() {
+  return [
+    { x: W / 2 + 10, y: 70, w: 90, h: 16 }, // Taste für Auto-Schuss
+    { x: (W - 110) / 2, y: 170, w: 110, h: 16 }, // Zurück
+  ];
+}
+
+function drawOptions(ctx, game) {
+  drawMenuBackground(ctx, game);
+  Font.draw(ctx, 'Optionen', W / 2, 18, { align: 'center', scale: 4, color: '#8b3dff', shadow: '#2a1050' });
+  const [keyBtn, back] = optionsButtons();
+
+  Font.draw(ctx, 'Auto-Schuss an / aus', keyBtn.x - 14, keyBtn.y + 5, { align: 'right', color: '#f1ede2' });
+  const overKey = inRect(Input.mouse, keyBtn);
+  ctx.fillStyle = game.rebinding ? '#3a2a55' : overKey ? '#2a2038' : '#1a1422';
+  ctx.fillRect(keyBtn.x, keyBtn.y, keyBtn.w, keyBtn.h);
+  ctx.strokeStyle = game.rebinding ? '#ffd34a' : '#8b3dff';
+  ctx.strokeRect(keyBtn.x + 0.5, keyBtn.y + 0.5, keyBtn.w - 1, keyBtn.h - 1);
+  const label = game.rebinding ? (Math.floor(game.time * 3) % 2 ? 'Taste drücken' : '') : Settings.keyLabel(Settings.autoFireKey);
+  Font.draw(ctx, label, keyBtn.x + keyBtn.w / 2, keyBtn.y + 5, { align: 'center', color: game.rebinding ? '#ffd34a' : '#ffffff', shadow: null });
+
+  const hint = game.rebinding ? 'Drück die neue Taste · ESC bricht ab' : 'Klick auf die Taste, um sie zu ändern (Standard: Q)';
+  Font.draw(ctx, hint, W / 2, 96, { align: 'center', color: '#8b8a95', shadow: null });
+  if (game.optionsMsg) Font.draw(ctx, game.optionsMsg, W / 2, 108, { align: 'center', color: game.optionsMsg === 'Gespeichert' ? '#7fe07f' : '#ff8a8a' });
+
+  const overBack = inRect(Input.mouse, back);
+  ctx.fillStyle = overBack ? '#3a2a55' : '#1a1422';
+  ctx.fillRect(back.x, back.y, back.w, back.h);
+  ctx.strokeStyle = '#8b3dff';
+  ctx.strokeRect(back.x + 0.5, back.y + 0.5, back.w - 1, back.h - 1);
+  Font.draw(ctx, 'Zurück (ESC)', W / 2, back.y + 5, { align: 'center', color: '#f1ede2', shadow: null });
 }
 
 function pauseButtons() {

@@ -30,7 +30,9 @@ Der Launcher startet das Spiel bei `npm start` direkt aus `../Soulgrind-Game`. I
 | `js/player.js` | Held: Bewegung, Angriffe, Fähigkeiten, XP-Kurve |
 | `js/enemies.js` | Gegnertypen, Mini-Bosse, Spawns |
 | `js/stages.js` | Ebenen, Boss Volghard, Pflanzen, Trolle, Steinsäulen, Steinboden (alle Ebenen-Werte) |
-| `js/projectiles.js` | Pfeile, Magiekugeln, Gegnerschüsse |
+| `js/settings.js` | Optionen (Taste für Auto-Schuss), localStorage |
+| `js/loot.js` | Gold, Herzen, Fledermaus-Schwarm, Boden-Effekte der Upgrades (Feuerspur, Rankenpfad, Meteor) |
+| `js/projectiles.js` | Pfeile, Magiekugeln, Gegnerschüsse, Zurückwerfen, Eispfeile |
 | `js/records.js` | Spielstände (localStorage) |
 | `js/hud.js` | HUD und alle Bildschirme (Auswahl, Stat-Wahl, Pause, Tod) |
 | `js/main.js` | Spielschleife, Zustände, `GAME_VERSION` |
@@ -41,6 +43,7 @@ Der Launcher startet das Spiel bei `npm start` direkt aus `../Soulgrind-Game`. I
 - **Klassen:** Krieger (Schwert + Schild, Nahkampf), Schütze (Bogen), Magier (Buch, Magie mit Flächenschaden). Schütze und Magier dürfen nicht zu schnell schießen.
 - **Fähigkeiten (Rechtsklick):** pro Klasse 2, Auswahl nach der Klassenwahl mit Beschreibung und Abklingzeit.
   Krieger: Schildblock 5 s / Wirbelschlag 6 s. Schütze: Hechtsprung (kurz unverwundbar) 5 s / Fächerschuss 4 s. Magier: Teleport zum Cursor (begrenzt) 10 s / Bannkreis (3 s Stun, wenig Schaden) 6 s.
+- **Säulen (Ebene 2):** erscheinen im Sichtfeld (plus Rand), 1 s pro Animationsstufe, damit man sie kommen sieht.
 - **Level:** max. 20, XP-Bedarf steigt stark. Bei jedem Level-Up 1 von 3 Stats wählen.
 - **Stats:** max. Rang 5 pro Stat, max. 5 verschiedene Stats pro Run, 2 Rerolls pro Run.
   Schaden +3 %, Rüstung -3 % Schaden, Max. Leben +8 %, Erholung +0,1 HP/s, Geschosstempo +6 %, Lauftempo +3 %, Mehr XP +3 %, Angriffstempo +3 % (pro Rang).
@@ -52,7 +55,14 @@ Der Launcher startet das Spiel bei `npm start` direkt aus `../Soulgrind-Game`. I
 - **Gegner:** Zombie, Fledermaus, Skelett-Schütze, Echse (selten, bleibt stehen, Warnlinie, ausweichbarer Strahl).
 - **Rundentimer:** je länger, desto mehr Gegner. Alle 3 Minuten ein Mini-Boss **ohne Ankündigung**, nur größer und stärker.
 - **Ebenen:** Ebene 1 (Wald) 5 Min., dann Timer-Stopp, Rest besiegen, Boss Volghard (Naturbaum, Dornen, wenige Pflanzen). Danach „Ebene geschafft“, gleicher Held in Ebene 2 (Steinebene: Trolle statt Zombies, animierte Steinsäulen mit Bremse und Bodyblock). Ebene 2 vorerst endlos.
-- **Auto-Schuss:** Q schaltet an/aus (alle Klassen, Ziel = Maus).
+- **Auto-Schuss:** Q schaltet an/aus (alle Klassen, Ziel = Maus). Taste im Optionen-Menü änderbar.
+- **Hauptmenü:** Spielen / Upgrades (Coming Soon, nicht klickbar) / Erfolge (Coming Soon, nicht klickbar) / Optionen.
+- **Gold:** 50 % Chance auf 1 Gold pro Gegner, Mini-Boss 10, Volghard 25. Hinlaufen zum Einsammeln (Magnet). Gold einer Ebene ist erst sicher, wenn die Ebene geschafft ist. Stirbt man vorher, ist das Gold dieser Ebene weg. Gesamt-Gold für alle Klassen, im Hauptmenü sichtbar.
+- **Herzen:** 8 % pro Gegner, heilen 20, liegen 15 s.
+- **Fledermaus-Schwarm:** selten, 6 bis 9 Fledermäuse fliegen schnell geradeaus durch, sterben mit einem Treffer, wenig XP, wenig Schaden.
+- **Krieger:** Schildblock und Wirbelschlag werfen gegnerische Geschosse zurück.
+- **Skelette** weichen nur mit 50 % Tempo zurück.
+- **Upgrades nach Ebene 1:** Wahl zwischen Upgrade der gewählten Fähigkeit oder der Ult (Werte unter `upgrade` in `classes.js`). Krieger: Spiegelschild / Sturmwalze / Feuersturm. Schütze: Rankenpfad / Frostfächer / Windläufer. Magier: Arkansprung / Doppelbann / Meteor.
 - ESC-Menü: Weiter / Run abbrechen.
 
 ## Releases

@@ -1,5 +1,5 @@
 // Spielschleife, Kamera, Effekte und Spielzustände (Auswahl, Spielen, Tod)
-const GAME_VERSION = '0.5.1';
+const GAME_VERSION = '0.6.0';
 const W = 384;
 const H = 216;
 const WORLD = 1600;
@@ -18,7 +18,17 @@ addEventListener('resize', fit);
 fit();
 
 const game = {
-  state: 'select', // select (Klasse) | ability (Fähigkeit) | play | cleared (Ebene geschafft) | dead
+  state: 'menu', // menu (Hauptmenü) | options | select (Klasse) | ability (Fähigkeit) | play | cleared (Ebene geschafft) | dead
+  menuHover: -1,
+  rebinding: false, // Optionen: wartet auf eine neue Taste
+  optionsMsg: '',
+  pickups: [], // Gold und Herzen am Boden
+  groundFx: [], // Feuerspur, Rankenpfad
+  meteors: [],
+  runGold: 0, // Gold dieser Ebene (geht beim Tod verloren)
+  bankedGold: 0, // Gold aus geschafften Ebenen (sicher)
+  swarmT: 0,
+  upgradeHover: -1,
   stage: 0, // Index in STAGES
   phase: 'waves', // waves (Gegnerwellen) | clear (Rest besiegen) | boss (Ebenen-Boss)
   stageBoss: null,
@@ -77,6 +87,8 @@ const game = {
     this.devGod = false;
     this.devUsed = false;
     this.runRecorded = false;
+    this.runGold = 0;
+    this.bankedGold = 0;
     this.enterStage(0);
   },
 
@@ -92,6 +104,11 @@ const game = {
     this.rings = [];
     this.pillars = [];
     this.zones = [];
+    this.pickups = [];
+    this.groundFx = [];
+    this.meteors = [];
+    this.runGold = 0;
+    this.swarmT = SWARM.firstAfter;
     this.pillarT = 3;
     this.runTime = 0;
     this.spawnT = 1;
@@ -118,10 +135,54 @@ const game = {
     }
     this.projectiles = [];
     this.zones = [];
+    this.meteors = [];
+    // liegengebliebenes Gold (auch das vom Boss) wird automatisch eingesammelt
+    for (const pk of this.pickups) if (pk.kind === 'gold') this.runGold++;
+    this.pickups = [];
+    // Gold dieser Ebene ist jetzt sicher
+    const gold = this.runGold;
+    this.bankedGold += gold;
+    if (!this.devUsed) Records.addGold(gold);
+    this.runGold = 0;
     this.state = 'cleared';
     this.clearT = 0;
-    const newBest = !this.devUsed && Records.submitStage(this.player.cls.id, this.stage + 1, this.runTime, true);
-    this.lastClear = { stage: this.stage + 1, name: this.stageDef.name, boss: this.stageBoss.type.name, time: this.runTime, newBest };
+    this.upgradeHover = -1;
+    const p = this.player;
+    const newBest = !this.devUsed && Records.submitStage(p.cls.id, this.stage + 1, this.runTime, true);
+    // Upgrade-Wahl: Fähigkeit oder Ult (nur was noch nicht gewählt wurde)
+    const options = [];
+    if (!p.abilityUp && p.ability.upgrade) options.push({ kind: 'ability', base: p.ability, up: p.ability.upgrade });
+    if (!p.ultUp && p.ult.upgrade) options.push({ kind: 'ult', base: p.ult, up: p.ult.upgrade });
+    this.lastClear = {
+      stage: this.stage + 1, name: this.stageDef.name, boss: this.stageBoss ? this.stageBoss.type.name : null,
+      time: this.runTime, newBest, gold, options,
+    };
+  },
+
+  pickUpgrade(i) {
+    const o = this.lastClear.options[i];
+    if (!o) return;
+    if (o.kind === 'ability') this.player.abilityUp = true;
+    else this.player.ultUp = true;
+    this.lastClear.options = [];
+    this.lastClear.picked = o.up.name;
+    Input.mouse.left = false;
+    this.enterStage(this.stage + 1);
+    this.fx.text(this.player.x, this.player.y - 18, o.up.name, '#ffd34a');
+  },
+
+  updateCleared(dt) {
+    this.clearT += dt;
+    if (this.clearT <= 1.2 || !STAGES[this.stage + 1]) return;
+    const opts = this.lastClear.options;
+    if (opts.length) {
+      this.upgradeHover = upgradeRects(opts.length).findIndex((r) => inRect(Input.mouse, r));
+      ['Digit1', 'Digit2'].forEach((k, i) => { if (Input.wasPressed(k)) this.pickUpgrade(i); });
+      if (Input.leftPressed && this.upgradeHover >= 0) this.pickUpgrade(this.upgradeHover);
+    } else if (Input.leftPressed) {
+      Input.mouse.left = false; // der Klick soll nicht gleich angreifen
+      this.enterStage(this.stage + 1);
+    }
   },
 
   // Run endet (Tod oder Abbruch): Zeit der aktuellen Ebene und Kills speichern
@@ -139,7 +200,7 @@ const game = {
   devAction(n) {
     const p = this.player;
     const actions = {
-      1: () => { if (STAGES[this.stage + 1]) this.enterStage(this.stage + 1); },
+      1: () => { if (STAGES[this.stage + 1]) this.stageCleared(); }, // wie geschafft, mit Upgrade-Wahl
       2: () => { if (this.stageDef.duration && this.phase === 'waves') this.runTime = this.stageDef.duration - 5; },
       3: () => p.gainXp((xpForLevel(p.level) - p.xp + 0.01) / (1 + p.bonus('xpGain')), this),
       4: () => { p.ultCharge = 1; },
@@ -181,6 +242,36 @@ const game = {
     this.fx.text(this.player.x, this.player.y - 16, this.autoFire ? 'Auto-Schuss an' : 'Auto-Schuss aus', this.autoFire ? '#7fe07f' : '#b9b4a6');
   },
 
+  // ---------- Hauptmenü und Optionen ----------
+
+  updateMenu() {
+    const btns = menuButtons();
+    this.menuHover = btns.findIndex((b) => inRect(Input.mouse, b));
+    if (!Input.leftPressed || this.menuHover < 0) return;
+    const b = btns[this.menuHover];
+    if (b.soon) return; // kommt bald, nicht anklickbar
+    if (b.id === 'play') this.state = 'select';
+    if (b.id === 'options') { this.state = 'options'; this.rebinding = false; this.optionsMsg = ''; }
+  },
+
+  updateOptions() {
+    if (this.rebinding) {
+      for (const code of Input.pressed) {
+        if (code === 'Escape') { this.rebinding = false; this.optionsMsg = ''; return; }
+        if (Settings.RESERVED.includes(code)) { this.optionsMsg = `${Settings.keyLabel(code)} ist schon belegt`; return; }
+        Settings.autoFireKey = code;
+        Settings.save();
+        this.rebinding = false;
+        this.optionsMsg = 'Gespeichert';
+        return;
+      }
+      return;
+    }
+    const [keyBtn, back] = optionsButtons();
+    if (Input.wasPressed('Escape') || (Input.leftPressed && inRect(Input.mouse, back))) { this.state = 'menu'; return; }
+    if (Input.leftPressed && inRect(Input.mouse, keyBtn)) { this.rebinding = true; this.optionsMsg = ''; }
+  },
+
   mouseWorld() {
     return { x: this.cam.x + Input.mouse.x, y: this.cam.y + Input.mouse.y };
   },
@@ -198,6 +289,7 @@ const game = {
       e.dead = true;
       this.player.kills++;
       this.player.onKill();
+      dropLoot(this, e);
       if (e.boss) {
         this.bossKills++;
         this.shake = 6;
@@ -279,7 +371,7 @@ const game = {
     this.player = null;
     this.enemies = [];
     this.projectiles = [];
-    this.state = 'select';
+    this.state = 'menu';
   },
 
   die() {
@@ -289,7 +381,10 @@ const game = {
     this.choice = null;
     this.devMenu = false;
     const newBest = this.recordRun();
-    this.lastRun = { cls: p.cls.name, level: p.level, kills: p.kills, bosses: this.bossKills, time: this.runTime, stage: this.stage + 1, newBest, dev: this.devUsed };
+    this.lastRun = {
+      cls: p.cls.name, level: p.level, kills: p.kills, bosses: this.bossKills, time: this.runTime, stage: this.stage + 1, newBest, dev: this.devUsed,
+      goldLost: this.runGold, goldKept: this.bankedGold,
+    };
     this.fx.burst(p.x, p.y, '#d93a4a', 30);
   },
 
@@ -313,7 +408,11 @@ const game = {
   update(dt) {
     this.time += dt;
 
+    if (this.state === 'menu') { this.updateMenu(); return; }
+    if (this.state === 'options') { this.updateOptions(); return; }
+
     if (this.state === 'select') {
+      if (Input.wasPressed('Escape') || (Input.leftPressed && inRect(Input.mouse, backRect()))) { this.state = 'menu'; return; }
       ['Digit1', 'Digit2', 'Digit3'].forEach((k, i) => { if (Input.wasPressed(k)) this.pickClass(CLASS_ORDER[i]); });
       if (Input.leftPressed && this.hoverCard >= 0) this.pickClass(CLASS_ORDER[this.hoverCard]);
       return;
@@ -343,30 +442,27 @@ const game = {
     if (this.paused) { this.updatePauseMenu(); return; }
 
     if (this.state === 'play') {
-      if (Input.wasPressed('KeyQ')) this.toggleAutoFire();
+      if (Input.wasPressed(Settings.autoFireKey)) this.toggleAutoFire();
       this.player.update(dt, this);
       this.updateZones(dt);
+      updateGroundFx(dt, this);
+      updateSwarm(dt, this);
       this.updatePhase(dt);
     }
 
-    if (this.state === 'cleared') {
-      this.clearT += dt;
-      if (this.clearT > 1.2 && Input.leftPressed && STAGES[this.stage + 1]) {
-        Input.mouse.left = false; // der Klick soll nicht gleich angreifen
-        this.enterStage(this.stage + 1);
-      }
-    }
+    if (this.state === 'cleared') this.updateCleared(dt);
 
     if (this.state === 'dead') {
       this.deadT += dt;
-      if (this.deadT > 1.2 && Input.leftPressed) this.state = 'select';
+      if (this.deadT > 1.2 && Input.leftPressed) this.state = 'menu';
     }
 
     for (const e of this.enemies) if (!e.dead) e.update(dt, this);
     separateEnemies(this.enemies);
     updatePillars(dt, this);
+    updatePickups(dt, this);
     if (this.player) {
-      for (const e of this.enemies) if (!e.dead) blockByPillars(e, this, e.speed * dt);
+      for (const e of this.enemies) if (!e.dead && !e.type.straight) blockByPillars(e, this, e.speed * dt);
       blockByPillars(this.player, this);
     }
     updateProjectiles(dt, this);
@@ -423,8 +519,10 @@ const game = {
   },
 
   draw() {
-    if (this.state === 'select' || this.state === 'ability') {
-      if (this.state === 'select') drawSelect(ctx, this);
+    if (['menu', 'options', 'select', 'ability'].includes(this.state)) {
+      if (this.state === 'menu') drawMenu(ctx, this);
+      else if (this.state === 'options') drawOptions(ctx, this);
+      else if (this.state === 'select') drawSelect(ctx, this);
       else drawAbilitySelect(ctx, this);
       drawCrosshair(ctx);
       return;
@@ -437,6 +535,8 @@ const game = {
     else drawGround(ctx, cam);
     drawPillarZones(ctx, cam, this);
     drawFireZones(ctx, cam, this);
+    drawGroundFx(ctx, cam, this);
+    drawPickups(ctx, cam, this);
 
     const actors = [...this.enemies, ...this.pillars];
     if (this.state !== 'dead') actors.push(this.player);
@@ -506,6 +606,7 @@ function separateEnemies(enemies) {
       const dy = b.y - a.y;
       const d = Math.hypot(dx, dy);
       const min = a.r + b.r;
+      if (a.type.straight || b.type.straight) continue; // Schwarm fliegt einfach durch
       if (d > 0 && d < min) {
         const fa = a.type.anchored ? 0 : b.type.anchored ? 1 : 0.5;
         const fb = b.type.anchored ? 0 : a.type.anchored ? 1 : 0.5;

@@ -42,7 +42,27 @@ class Player {
     this.ultTick = 0;
     this.poisonT = 0; // Restdauer Gift
     this.poisonTick = 0;
+    this.abilityUp = false; // Upgrade nach Ebene 1 gewählt
+    this.ultUp = false;
+    this.iceShots = 0; // Frostfächer: so viele normale Schüsse sind noch Eispfeile
+    this.trailT = 0; // Feuersturm: Abstand zwischen zwei Feuerflecken
   }
+
+  // Aktive Upgrades (null, wenn nicht gewählt)
+  get abUp() { return this.abilityUp ? this.ability.upgrade : null; }
+  get ultUpg() { return this.ultUp ? this.ult.upgrade : null; }
+  get abilityCooldown() { return (this.abUp && this.abUp.cooldown) || this.ability.cooldown; }
+  get projectileImmune() { return this.ultActive && !!this.ultUpg && !!this.ultUpg.projectileImmune; }
+  ultValue(key) { return (this.ultUpg && this.ultUpg[key] !== undefined ? this.ultUpg[key] : this.ult[key]) || 0; }
+
+  // Krieger: Umkreis, in dem gegnerische Geschosse zurückgeworfen werden (0 = gerade nicht)
+  reflectRadius() {
+    if (this.cls.id !== 'warrior') return 0;
+    if (this.blockT > 0) return this.r + 7;
+    if (this.spin && this.ability.id === 'whirl') return this.ability.radius;
+    return 0;
+  }
+  reflectFactor() { return (this.abUp && this.abUp.reflectFactor) || this.ability.reflectFactor || 1; }
 
   get ult() { return this.cls.ult; }
   get ultActive() { return this.ultT > 0; }
@@ -56,8 +76,8 @@ class Player {
   bonus(id) { return this.rank(id) * STATS[id].per; }
 
   get dmgMul() { return (1 + this.cls.growth.dmg * (this.level - 1)) * (1 + this.bonus('damage')); }
-  get speed() { return this.cls.speed * (1 + this.bonus('moveSpeed')) * (this.ultActive ? 1 + (this.ult.moveSpeed || 0) : 1); }
-  get cooldown() { return this.cls.cooldown / (1 + this.bonus('attackSpeed') + (this.ultActive ? this.ult.attackSpeed || 0 : 0)); }
+  get speed() { return this.cls.speed * (1 + this.bonus('moveSpeed')) * (this.ultActive ? 1 + this.ultValue('moveSpeed') : 1); }
+  get cooldown() { return this.cls.cooldown / (1 + this.bonus('attackSpeed') + (this.ultActive ? this.ultValue('attackSpeed') : 0)); }
   get projSpeed() { return this.cls.projSpeed * (1 + this.bonus('projSpeed')); }
   get abilityActive() { return this.blockT > 0 || !!this.spin || !!this.dash; }
 
@@ -94,7 +114,13 @@ class Player {
       this.y += this.dash.vy * step;
       this.dash.t -= dt;
       if (Math.random() < 0.8) game.fx.particle(this.x, this.y + 3, '#62a050', 0.3, 10);
-      if (this.dash.t <= 0) this.dash = null;
+      if (this.dash.t <= 0) {
+        const up = this.abUp;
+        if (up && up.life) { // Rankenpfad entlang des Sprungs
+          game.groundFx.push({ kind: 'vines', x1: this.dash.sx, y1: this.dash.sy, x2: this.x, y2: this.y, width: up.width, slow: up.slow, t: up.life, seed: Math.random() * 10 });
+        }
+        this.dash = null;
+      }
     } else if (len) {
       const speed = this.speed * (this.blockT > 0 ? this.ability.slow : 1) * pillarSlow(game, this.x, this.y);
       this.x += this.moveDir.x * speed * dt;
@@ -135,7 +161,7 @@ class Player {
 
     if (Input.rightPressed && this.abilityCd <= 0) {
       this.useAbility(game);
-      this.abilityCd = this.ability.cooldown;
+      this.abilityCd = this.abilityCooldown;
     }
 
     // Linksklick gedrückt halten oder Auto-Schuss (Q) an
@@ -156,9 +182,11 @@ class Player {
 
   useAbility(game) {
     const ab = this.ability;
+    const up = this.abUp;
     switch (ab.id) {
       case 'block':
-        this.blockT = ab.duration;
+        this.blockT = up ? up.duration : ab.duration;
+        if (up) this.invulnT = this.blockT; // Spiegelschild: unverwundbar
         game.fx.ring(this.x, this.y, '#7fd4ff', 14);
         break;
 
@@ -172,18 +200,27 @@ class Player {
           }
         }
         game.fx.ring(this.x, this.y, '#f1ede2', ab.radius);
+        if (up) { // Sturmwalze: Wirbelsturm rollt zum Mauszeiger
+          game.projectiles.push({
+            friendly: true, kind: 'tornado', x: this.x, y: this.y,
+            vx: Math.cos(this.aim) * up.speed, vy: Math.sin(this.aim) * up.speed, life: up.range / up.speed,
+            r: up.radius, dmg: Math.round(this.rollDamage() * up.dmgFactor), pierce: 999, hit: new Set(),
+            aoe: 0, knockback: 6, slow: up.slow, slowTime: up.slowTime,
+          });
+        }
         break;
 
       case 'dash': {
         const dir = this.moving ? this.moveDir : { x: Math.cos(this.aim), y: Math.sin(this.aim) };
-        this.dash = { t: ab.time, vx: (dir.x * ab.distance) / ab.time, vy: (dir.y * ab.distance) / ab.time };
+        this.dash = { t: ab.time, vx: (dir.x * ab.distance) / ab.time, vy: (dir.y * ab.distance) / ab.time, sx: this.x, sy: this.y };
         this.invulnT = ab.invuln;
         game.fx.burst(this.x, this.y, '#62a050', 8);
         break;
       }
 
       case 'fan':
-        for (const off of [-ab.spread, 0, ab.spread]) this.fireProjectile(game, this.aim + off);
+        for (const off of [-ab.spread, 0, ab.spread]) this.fireProjectile(game, this.aim + off, { ice: !!up });
+        if (up) this.iceShots = up.iceShots;
         break;
 
       case 'teleport': {
@@ -194,24 +231,46 @@ class Player {
         if (d > ab.range) { tx = (tx / d) * ab.range; ty = (ty / d) * ab.range; }
         game.fx.burst(this.x, this.y, '#b07cff', 16);
         game.fx.ring(this.x, this.y, '#b07cff', 10);
+        if (up) this.orbBurst(game, up);
         this.x = Math.max(8, Math.min(WORLD - 8, this.x + tx));
         this.y = Math.max(8, Math.min(WORLD - 8, this.y + ty));
         game.fx.burst(this.x, this.y, '#e0ccff', 16);
         game.fx.ring(this.x, this.y, '#b07cff', 14);
+        if (up) this.orbBurst(game, up);
         break;
       }
 
-      case 'stun':
-        for (const e of game.enemies) {
-          if (e.dead) continue;
-          if (Math.hypot(e.x - this.x, e.y - this.y) > ab.radius + e.r) continue;
-          e.stunT = e.boss ? ab.stun / 2 : ab.stun;
-          game.hitEnemy(e, Math.round(this.rollDamage() * ab.dmgFactor), Math.atan2(e.y - this.y, e.x - this.x), 0);
+      case 'stun': {
+        const centers = [{ x: this.x, y: this.y }];
+        if (up) centers.push(game.mouseWorld()); // Doppelbann: zweiter Kreis am Mauszeiger
+        const hitOnce = new Set();
+        for (const c of centers) {
+          for (const e of game.enemies) {
+            if (e.dead || hitOnce.has(e)) continue;
+            if (Math.hypot(e.x - c.x, e.y - c.y) > ab.radius + e.r) continue;
+            hitOnce.add(e);
+            e.stunT = e.boss ? ab.stun / 2 : ab.stun;
+            game.hitEnemy(e, Math.round(this.rollDamage() * ab.dmgFactor), Math.atan2(e.y - c.y, e.x - c.x), 0);
+          }
+          game.fx.ring(c.x, c.y, '#7fd4ff', ab.radius);
+          game.fx.ring(c.x, c.y, '#ffffff', ab.radius * 0.6);
         }
-        game.fx.ring(this.x, this.y, '#7fd4ff', ab.radius);
-        game.fx.ring(this.x, this.y, '#ffffff', ab.radius * 0.6);
         this.castT = 0.3;
         break;
+      }
+    }
+  }
+
+  // Arkansprung: kleine Magiekugeln fliegen in alle Richtungen
+  orbBurst(game, up) {
+    for (let i = 0; i < up.orbs; i++) {
+      const a = (i * Math.PI * 2) / up.orbs;
+      game.projectiles.push({
+        friendly: true, kind: 'orb', small: true, x: this.x, y: this.y,
+        vx: Math.cos(a) * up.orbSpeed, vy: Math.sin(a) * up.orbSpeed, life: up.orbRange / up.orbSpeed,
+        r: 2, dmg: Math.round(this.rollDamage() * up.orbDmg), pierce: 1, hit: new Set(),
+        aoe: 12, aoeFactor: 0.5, knockback: 2,
+      });
     }
   }
 
@@ -233,6 +292,10 @@ class Player {
       game.zones.push({ x: m.x, y: m.y, t: u.duration, max: u.duration, tick: 0, radius: u.radius, owner: this });
       game.fx.ring(m.x, m.y, '#ff9a3c', u.radius);
       this.castT = 0.3;
+      const up = this.ultUpg;
+      if (up && up.delay) { // Meteor schlägt in die Feuerzone ein
+        game.meteors.push({ x: m.x, y: m.y, t: up.delay, delay: up.delay, radius: u.radius, dmg: Math.round(this.rollDamage() * up.dmgFactor) });
+      }
     }
   }
 
@@ -249,6 +312,15 @@ class Player {
           if (Math.hypot(e.x - this.x, e.y - this.y) > u.radius + e.r) continue;
           game.hitEnemy(e, Math.round(this.rollDamage() * u.dmgFactor), Math.atan2(e.y - this.y, e.x - this.x), u.knockback);
         }
+      }
+      // Feuersturm: Feuerspur beim Laufen
+      const up = this.ultUpg;
+      if (up && up.trailEvery && this.moving && (this.trailT -= dt) <= 0) {
+        this.trailT = up.trailEvery;
+        game.groundFx.push({
+          kind: 'fire', x: this.x, y: this.y + 3, radius: up.trailRadius, t: up.trailLife, seed: Math.random() * 10,
+          burnTime: up.burnTime, burnTick: up.burnTick, burnDmg: this.rollDamage() * up.burnFactor,
+        });
       }
     } else if (u.id === 'frenzy') {
       if (Math.random() < dt * 20) game.fx.particle(this.x, this.y + 3, Math.random() < 0.5 ? '#9be05a' : '#ffd34a', 0.35, 8);
@@ -271,11 +343,14 @@ class Player {
       }
       return;
     }
-    this.fireProjectile(game, a);
+    // Frostfächer: die nächsten normalen Schüsse sind noch Eispfeile
+    const ice = this.iceShots > 0;
+    if (ice) this.iceShots--;
+    this.fireProjectile(game, a, { ice });
     if (c.attack === 'orb') this.castT = 0.2;
   }
 
-  fireProjectile(game, a) {
+  fireProjectile(game, a, { ice = false } = {}) {
     const c = this.cls;
     const speed = this.projSpeed;
     const proj = {
@@ -294,6 +369,7 @@ class Player {
       aoe: c.aoe || 0,
       aoeFactor: c.aoeFactor || 0,
       knockback: c.knockback,
+      freeze: ice && this.abUp ? this.abUp.freeze : 0,
     };
 
     // Nahschuss: Ein Gegner, der den Helden berührt, wird immer getroffen, egal wohin gezielt wird
@@ -311,6 +387,7 @@ class Player {
         explode(proj, game, touching);
         return;
       }
+      applyHitEffects(touching, proj);
       game.hitEnemy(touching, proj.dmg, Math.atan2(touching.y - this.y, touching.x - this.x), proj.knockback);
       proj.hit.add(touching);
       if (--proj.pierce <= 0) return;
