@@ -1,5 +1,5 @@
 // Spielschleife, Kamera, Effekte und Spielzustände (Auswahl, Spielen, Tod)
-const GAME_VERSION = '0.7.1';
+const GAME_VERSION = '0.8.0';
 const W = 384;
 const H = 216;
 const WORLD = 1600;
@@ -150,6 +150,7 @@ const game = {
     if (!this.devUsed) Records.addGold(gold);
     this.runGold = 0;
     this.state = 'cleared';
+    Sound.jingle('stageClear');
     this.clearT = 0;
     this.upgradeHover = -1;
     const p = this.player;
@@ -161,6 +162,7 @@ const game = {
     // Boss der letzten Ebene besiegt: gewonnen!
     if (!STAGES[this.stage + 1]) {
       this.state = 'victory';
+      Sound.jingle('victory');
       this.deadT = 0;
       this.lastClear = { stage: this.stage + 1, boss: this.stageBoss ? this.stageBoss.type.name : null, gold, newBest, options: [] };
       this.finishRun('win');
@@ -179,6 +181,7 @@ const game = {
   pickUpgrade(i) {
     const o = this.lastClear.options[i];
     if (!o) return;
+    Sound.play('levelup');
     if (o.kind === 'ability') this.player.abilityUp = true;
     else this.player.ultUp = true;
     this.lastClear.options = [];
@@ -213,6 +216,7 @@ const game = {
     const newBest = result !== 'win' && Records.submitStage(id, this.stage + 1, this.runTime, false);
     Tracker.commitRun(this, result);
     this.newAchievements = Cosmetics.checkNew(id);
+    if (this.newAchievements.length) setTimeout(() => Sound.play('achievement'), 1600);
     return newBest;
   },
 
@@ -259,6 +263,7 @@ const game = {
 
   toggleAutoFire() {
     this.autoFire = !this.autoFire;
+    Sound.play('click');
     try { localStorage.setItem('soulgrind.autoFire', this.autoFire ? '1' : '0'); } catch (e) { /* egal */ }
     this.fx.text(this.player.x, this.player.y - 16, this.autoFire ? 'Auto-Schuss an' : 'Auto-Schuss aus', this.autoFire ? '#7fe07f' : '#b9b4a6');
   },
@@ -271,6 +276,7 @@ const game = {
     if (Input.leftPressed && inRect(Input.mouse, discordRect())) { openDiscord(); return; }
     if (!Input.leftPressed || this.menuHover < 0) return;
     const b = btns[this.menuHover];
+    Sound.play('click');
     if (b.id === 'play') this.state = 'select';
     else this.openTab(b.id);
   },
@@ -289,16 +295,16 @@ const game = {
     if (Input.wasPressed('Escape') || (Input.leftPressed && inRect(Input.mouse, backRect()))) { this.state = 'menu'; return; }
     const tabs = tabRects(this.state);
     const t = tabs.findIndex((r) => inRect(Input.mouse, r));
-    if (Input.leftPressed && t >= 0) { this.tab = t; return; }
+    if (Input.leftPressed && t >= 0) { this.tab = t; Sound.play('click'); return; }
     if (!Input.leftPressed) return;
     if (this.state === 'upgrades') {
       const i = metaRowRects().findIndex((r) => inRect(Input.mouse, r.buy));
-      if (i >= 0 && Meta.buy(META.upgrades[i].id)) this.menuFlash = { i, t: this.time };
+      if (i >= 0 && Meta.buy(META.upgrades[i].id)) { this.menuFlash = { i, t: this.time }; Sound.play('buy'); }
     } else if (this.state === 'achievements') {
       const cls = CLASS_ORDER[this.tab];
       const i = achievementRows().findIndex((r) => inRect(Input.mouse, r.btn));
       const a = ACHIEVEMENTS[cls][i];
-      if (a && achievementDone(cls, a)) Cosmetics.toggle(cls, a.reward);
+      if (a && achievementDone(cls, a)) { Cosmetics.toggle(cls, a.reward); Sound.play('click'); }
     }
   },
 
@@ -315,9 +321,30 @@ const game = {
       }
       return;
     }
-    const [keyBtn, back] = optionsButtons();
-    if (Input.wasPressed('Escape') || (Input.leftPressed && inRect(Input.mouse, back))) { this.state = 'menu'; return; }
-    if (Input.leftPressed && inRect(Input.mouse, keyBtn)) { this.rebinding = true; this.optionsMsg = ''; }
+    const o = optionsButtons();
+    if (Input.wasPressed('Escape') || (Input.leftPressed && inRect(Input.mouse, o.back))) { this.state = 'menu'; Sound.play('click'); return; }
+    if (Input.leftPressed && inRect(Input.mouse, o.key)) { this.rebinding = true; this.optionsMsg = ''; Sound.play('click'); }
+    if (Input.leftPressed && inRect(Input.mouse, o.mute)) {
+      Settings.muted = !Settings.muted;
+      Settings.save();
+      Sound.fromSettings();
+      Sound.play('click');
+    }
+    // Regler: anklicken oder mit gedrückter Maus ziehen (etwas größerer Greifbereich)
+    for (const [id, key] of [['music', 'musicVol'], ['sfx', 'sfxVol']]) {
+      const r = o[id];
+      const grab = { x: r.x - 4, y: r.y - 4, w: r.w + 8, h: r.h + 8 };
+      if (Input.leftPressed && inRect(Input.mouse, grab)) this.dragging = id;
+      if (this.dragging === id && Input.mouse.left) {
+        Settings[key] = Math.round(Math.max(0, Math.min(1, (Input.mouse.x - r.x) / r.w)) * 20) / 20;
+        Sound.fromSettings();
+      }
+    }
+    if (this.dragging && !Input.mouse.left) {
+      if (this.dragging === 'sfx') Sound.play('gold'); // Probeton
+      this.dragging = null;
+      Settings.save();
+    }
   },
 
   mouseWorld() {
@@ -332,6 +359,7 @@ const game = {
     }
     e.hp -= dmg;
     e.flash = 0.08;
+    Sound.play('hit');
     const kb = e.type.anchored ? 0 : e.boss ? knockback * 0.2 : knockback;
     e.x += Math.cos(angle) * kb;
     e.y += Math.sin(angle) * kb;
@@ -341,6 +369,7 @@ const game = {
       e.dead = true;
       this.player.kills++;
       this.player.onKill();
+      Sound.play('kill');
       dropLoot(this, e);
       this.run.kills++;
       this.run.killsByType[e.type.name] = (this.run.killsByType[e.type.name] || 0) + 1;
@@ -359,6 +388,7 @@ const game = {
 
   levelUp() {
     this.levelBanner = 2;
+    Sound.play('levelup');
     this.fx.ring(this.player.x, this.player.y, '#ffd34a', 30);
     this.fx.burst(this.player.x, this.player.y, '#ffd34a', 20);
     this.pendingChoices++;
@@ -378,6 +408,7 @@ const game = {
     const id = this.choice && this.choice.options[i];
     if (!id) return;
     this.player.addStat(id, this);
+    Sound.play('click');
     this.fx.text(this.player.x, this.player.y - 16, `${STATS[id].name} ${this.player.rank(id)}`, '#b07cff');
     this.choice = null;
     this.pendingChoices--;
@@ -433,6 +464,7 @@ const game = {
   die() {
     const p = this.player;
     this.state = 'dead';
+    Sound.jingle('death');
     this.deadT = 0;
     this.choice = null;
     this.devMenu = false;
@@ -463,6 +495,7 @@ const game = {
 
   update(dt) {
     this.time += dt;
+    this.updateMusic();
 
     if (this.state === 'menu') { this.updateMenu(); return; }
     if (MENU_TABS.includes(this.state)) { this.updateTab(); return; }
@@ -494,7 +527,7 @@ const game = {
       for (let n = 1; n <= 6; n++) if (Input.wasPressed(`Digit${n}`)) this.devAction(n);
       return;
     }
-    if (this.state === 'play' && Input.wasPressed('Escape')) this.paused = !this.paused;
+    if (this.state === 'play' && Input.wasPressed('Escape')) { this.paused = !this.paused; Sound.play('click'); }
     if (this.paused) { this.updatePauseMenu(); return; }
 
     if (this.state === 'play') {
@@ -546,6 +579,16 @@ const game = {
     // Kamera folgt dem Spieler weich
     this.cam.x += (p.x - W / 2 - this.cam.x) * Math.min(1, dt * 8);
     this.cam.y += (p.y - H / 2 - this.cam.y) * Math.min(1, dt * 8);
+  },
+
+  // Musik passend zum Bildschirm: Menü, Ebene oder Bosskampf. Tod, Sieg und Ebene geschafft haben eigene Melodien.
+  updateMusic() {
+    let want = null;
+    if (this.state === 'menu' || this.state === 'select' || this.state === 'ability' || MENU_TABS.includes(this.state)) want = 'menu';
+    else if (this.state === 'play') want = this.phase === 'boss' ? 'boss' : this.stageDef.music;
+    if (want) Sound.playMusic(want);
+    // in Pause, Stat-Wahl und Dev-Menü leiser
+    Sound.setDuck(this.state === 'play' && (this.paused || this.choice || this.devMenu) ? 0.35 : 1);
   },
 
   // Ablauf einer Ebene: Wellen bis zum Zeitlimit, dann Rest besiegen, dann Ebenen-Boss
@@ -691,6 +734,9 @@ function separateEnemies(enemies) {
     }
   }
 }
+
+// Ton darf der Browser erst nach dem ersten Klick oder Tastendruck starten
+for (const ev of ['mousedown', 'keydown']) addEventListener(ev, () => { if (Sound.init()) Sound.fromSettings(); });
 
 addEventListener('blur', () => { if (game.state === 'play') game.paused = true; });
 

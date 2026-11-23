@@ -77,7 +77,10 @@ Neue wichtige Entscheidungen bitte unten ergänzen.
 
 - **v0.7.1:** Gold-Chance pro Gegner von 50 % auf 20 % gesenkt. Kill-Erfolge von 500/1000 auf 5000/10000 Kills erhöht (Wunsch des Nutzers).
 
+- **v0.8.0 (23.11.2026), Sound und Musik:** Der Nutzer hat sich den Klang vorher in einer Vorschau-Seite angehört und freigegeben. Alles wird im Code erzeugt (Retro/Chiptune). 25 Effekte, 4 Musik-Tracks (Menü, Wald, Katakomben, Boss), 3 kurze Melodien. Optionen: Regler für Musik und Effekte, Ton an/aus. Die Musik stammt von Claude und ist eher einfach; der Nutzer kann Tracks später mit BeepBox selbst komponieren und ersetzen.
+
 ## Offene Punkte und Ideen
+- **Weitere Ideen vom 23.11.:** Prestige-Punkte, Loot/Relikte, Elite-Gegner und Schreine, Tages-Herausforderung mit Online-Rangliste, vierte Klasse, Launcher-Selbstupdate, Gegner-Lexikon, Controller.
 - **Ebene 3** mit Boss (laut Erfolgen ein Kraken) und die Ebene-3-Erfolge (Krone + Titel) fehlen noch.
 - **Online-Rangliste** als eigenes Update.
 - **Boss für Ebene 2** fehlt noch (der Nutzer liefert die Idee).

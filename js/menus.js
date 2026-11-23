@@ -269,14 +269,37 @@ function drawStatsTab(ctx, game) {
 // ---------- Optionen ----------
 
 function optionsButtons() {
-  return [
-    { x: W / 2 + 10, y: 70, w: 90, h: 16 }, // Taste für Auto-Schuss
-    { x: (W - 110) / 2, y: 170, w: 110, h: 16 }, // Zurück
-  ];
+  const x = W / 2 + 10;
+  return {
+    key: { x, y: 52, w: 90, h: 16 }, // Taste für Auto-Schuss
+    music: { x, y: 82, w: 120, h: 9 }, // Musik-Regler (anklicken oder ziehen)
+    sfx: { x, y: 102, w: 120, h: 9 }, // Effekte-Regler
+    mute: { x, y: 120, w: 90, h: 16 }, // Ton an / aus
+    back: { x: (W - 110) / 2, y: 180, w: 110, h: 16 }, // Zurück
+  };
+}
+
+function drawSlider(ctx, r, value, label) {
+  Font.draw(ctx, label, r.x - 14, r.y + 2, { align: 'right', color: '#f1ede2' });
+  ctx.fillStyle = '#1a1420';
+  ctx.fillRect(r.x - 1, r.y - 1, r.w + 2, r.h + 2);
+  ctx.fillStyle = '#2a2230';
+  ctx.fillRect(r.x, r.y, r.w, r.h);
+  ctx.fillStyle = inRect(Input.mouse, r) ? '#b07cff' : '#8b3dff';
+  ctx.fillRect(r.x, r.y, Math.round(r.w * value), r.h);
+  ctx.fillStyle = '#f1ede2';
+  ctx.fillRect(r.x + Math.round(r.w * value) - 1, r.y - 2, 3, r.h + 4);
+  Font.draw(ctx, `${Math.round(value * 100)} %`, r.x + r.w + 8, r.y + 2, { color: '#b9b4a6', shadow: null });
 }
 
 function drawOptions(ctx, game) {
-  const [keyBtn, back] = optionsButtons();
+  const o = optionsButtons();
+  const keyBtn = o.key;
+  const back = o.back;
+  drawSlider(ctx, o.music, Settings.musicVol, 'Musik');
+  drawSlider(ctx, o.sfx, Settings.sfxVol, 'Effekte');
+  Font.draw(ctx, 'Ton', o.mute.x - 14, o.mute.y + 5, { align: 'right', color: '#f1ede2' });
+  drawButton(ctx, o.mute, Settings.muted ? 'Aus' : 'An', { hover: inRect(Input.mouse, o.mute), color: Settings.muted ? '#d93a4a' : '#9be05a' });
   Font.draw(ctx, 'Auto-Schuss an / aus', keyBtn.x - 14, keyBtn.y + 5, { align: 'right', color: '#f1ede2' });
   const overKey = inRect(Input.mouse, keyBtn);
   ctx.fillStyle = game.rebinding ? '#3a2a55' : overKey ? '#2a2038' : '#1a1422';
@@ -287,8 +310,8 @@ function drawOptions(ctx, game) {
   Font.draw(ctx, label, keyBtn.x + keyBtn.w / 2, keyBtn.y + 5, { align: 'center', color: game.rebinding ? '#ffd34a' : '#ffffff', shadow: null });
 
   const hint = game.rebinding ? 'Drück die neue Taste · ESC bricht ab' : 'Klick auf die Taste, um sie zu ändern (Standard: Q)';
-  Font.draw(ctx, hint, W / 2, 96, { align: 'center', color: '#8b8a95', shadow: null });
-  if (game.optionsMsg) Font.draw(ctx, game.optionsMsg, W / 2, 108, { align: 'center', color: game.optionsMsg === 'Gespeichert' ? '#7fe07f' : '#ff8a8a' });
+  Font.draw(ctx, hint, W / 2, 148, { align: 'center', color: '#8b8a95', shadow: null });
+  if (game.optionsMsg) Font.draw(ctx, game.optionsMsg, W / 2, 160, { align: 'center', color: game.optionsMsg === 'Gespeichert' ? '#7fe07f' : '#ff8a8a' });
   drawButton(ctx, back, 'Zurück (ESC)', { hover: inRect(Input.mouse, back) });
 }
 

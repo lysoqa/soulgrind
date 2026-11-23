@@ -76,10 +76,12 @@ function collectPickup(game, pk) {
   const p = game.player;
   if (pk.kind === 'gold') {
     game.runGold++;
+    Sound.play('gold');
     game.fx.text(p.x, p.y - 14, '+1 Gold', '#ffd34a');
   } else {
     p.hp = Math.min(p.maxHp, p.hp + LOOT.heartHeal);
     game.run.hearts++;
+    Sound.play('heart');
     game.fx.text(p.x, p.y - 14, `+${LOOT.heartHeal}`, '#7fe07f');
     game.fx.burst(p.x, p.y, '#e04848', 8);
   }
@@ -141,6 +143,7 @@ function updateSwarm(dt, game) {
   const [c1, c2] = SWARM.count;
   const n = c1 + Math.floor(Math.random() * (c2 - c1 + 1));
   const lvl = enemyLevel(game);
+  Sound.play('swarm');
   for (let i = 0; i < n; i++) {
     const side = (i - (n - 1) / 2) * 7;
     const back = Math.random() * 20;

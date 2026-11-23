@@ -30,7 +30,8 @@ Der Launcher startet das Spiel bei `npm start` direkt aus `../Soulgrind-Game`. I
 | `js/player.js` | Held: Bewegung, Angriffe, Fähigkeiten, XP-Kurve |
 | `js/enemies.js` | Gegnertypen, Mini-Bosse, Spawns |
 | `js/stages.js` | Ebenen, Boss Volghard, Pflanzen, Trolle, Steinsäulen, Steinboden (alle Ebenen-Werte) |
-| `js/settings.js` | Optionen (Taste für Auto-Schuss), localStorage |
+| `js/settings.js` | Optionen (Taste für Auto-Schuss, Lautstärke Musik/Effekte, Ton aus), localStorage |
+| `js/audio.js` | Soundeffekte (`SFX`), Musik (`MUSIC`) und kurze Melodien (`JINGLES`), alles im Code erzeugt (Web Audio API). `Sound.play('name')` für Effekte |
 | `js/loot.js` | Gold, Herzen, Fledermaus-Schwarm, Boden-Effekte der Upgrades (Feuerspur, Rankenpfad, Meteor) |
 | `js/projectiles.js` | Pfeile, Magiekugeln, Gegnerschüsse, Zurückwerfen, Eispfeile |
 | `js/records.js` | Spielstände und Gesamt-Gold (localStorage) |
@@ -63,6 +64,7 @@ Der Launcher startet das Spiel bei `npm start` direkt aus `../Soulgrind-Game`. I
 - **Erfolge:** pro Klasse 4 (Spezial-Zähler 250, 5000 Kills, 10000 Kills, Boss Ebene 3 noch gesperrt). Belohnungen = Skins, im Erfolge-Tab an-/ablegbar.
 - **Statistik:** Reiter Insgesamt + jede Klasse. Lokal gespeichert. Online-Rangliste ist für ein eigenes späteres Update geplant (braucht einen Online-Speicher, z. B. Supabase, den der Nutzer anlegt).
 - **Discord-Link** im Hauptmenü: https://discord.gg/ad2RtwyGyv (der Launcher öffnet Links ab Spielhalle 0.3.0 im Browser).
+- **Sound:** Effekte und Chiptune-Musik werden im Code erzeugt, keine Sounddateien. Musik: Menü, Wald, Katakomben, Bosskampf. Melodien für Ebene geschafft, Sieg, Tod. Musik in Pause und Stat-Wahl leiser. `tools/sound-preview.html` zum Anhören (im normalen Browser öffnen).
 - **Auto-Schuss:** Q schaltet an/aus (alle Klassen, Ziel = Maus). Taste im Optionen-Menü änderbar.
 - **Hauptmenü:** Spielen / Upgrades / Erfolge / Statistik / Optionen, darunter der Discord-Link.
 - **Gold:** 20 % Chance auf 1 Gold pro Gegner, Mini-Boss 10, Volghard 25. Hinlaufen zum Einsammeln (Magnet). Gold einer Ebene ist erst sicher, wenn die Ebene geschafft ist. Stirbt man vorher, ist das Gold dieser Ebene weg. Gesamt-Gold für alle Klassen, im Hauptmenü sichtbar.

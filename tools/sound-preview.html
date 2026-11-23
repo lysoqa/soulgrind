@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Soulgrind Sounds</title>
+  <style>
+    :root { --bg: #100c16; --card: #1a1422; --line: #3a3046; --text: #f1ede2; --muted: #8b8a95; --accent: #8b3dff; --gold: #ffd34a; }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.4 system-ui, sans-serif; padding: 24px 16px 48px; }
+    main { max-width: 920px; margin: 0 auto; }
+    h1 { color: var(--accent); margin: 0 0 4px; font-size: 28px; letter-spacing: 1px; }
+    h2 { color: var(--gold); font-size: 16px; margin: 28px 0 10px; text-transform: uppercase; letter-spacing: 1px; }
+    p { color: var(--muted); margin: 0 0 12px; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 8px; }
+    button { background: var(--card); color: var(--text); border: 1px solid var(--line); border-radius: 6px; padding: 10px 12px; font: inherit; text-align: left; cursor: pointer; }
+    button:hover { border-color: var(--accent); background: #241c30; }
+    button.playing { border-color: var(--gold); color: var(--gold); }
+    .row { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 12px 14px; }
+    label { display: flex; gap: 8px; align-items: center; color: var(--muted); }
+    input[type=range] { width: 140px; accent-color: var(--accent); }
+    .stop { border-color: #d93a4a; }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Soulgrind – Sound-Vorschau</h1>
+  <p>Alles wird live im Code erzeugt, keine Sounddateien. Einfach anklicken und anhören. Noch nicht im Spiel eingebaut.</p>
+
+  <div class="row">
+    <label>Musik <input id="vMusic" type="range" min="0" max="1" step="0.05" value="0.5"></label>
+    <label>Effekte <input id="vSfx" type="range" min="0" max="1" step="0.05" value="0.7"></label>
+    <button class="stop" id="stop">Musik stoppen</button>
+  </div>
+
+  <h2>Musik (Schleifen)</h2>
+  <div class="grid" id="music"></div>
+
+  <h2>Kurze Melodien</h2>
+  <div class="grid" id="jingles"></div>
+
+  <h2>Soundeffekte</h2>
+  <div class="grid" id="sfx"></div>
+</main>
+<script src="../js/audio.js"></script>
+<script>
+  const ready = () => Sound.init();
+  const add = (parent, label, fn) => {
+    const b = document.createElement('button');
+    b.textContent = label;
+    b.onclick = () => { ready(); fn(b); };
+    document.getElementById(parent).appendChild(b);
+    return b;
+  };
+  const musicBtns = [];
+  for (const [id, t] of Object.entries(MUSIC)) {
+    musicBtns.push(add('music', `▶ ${t.label}`, (b) => {
+      Sound.playMusic(id);
+      musicBtns.forEach((x) => x.classList.remove('playing'));
+      b.classList.add('playing');
+    }));
+  }
+  for (const [id, j] of Object.entries(JINGLES)) add('jingles', `♪ ${j.label}`, () => { Sound.jingle(id); musicBtns.forEach((x) => x.classList.remove('playing')); });
+  for (const [id, s] of Object.entries(SFX)) add('sfx', s.label, () => { Sound.lastPlayed[id] = -1; Sound.play(id); });
+  document.getElementById('stop').onclick = () => { Sound.stopMusic(); musicBtns.forEach((x) => x.classList.remove('playing')); };
+  document.getElementById('vMusic').oninput = (e) => { ready(); Sound.volume.music = Number(e.target.value); Sound.applyVolume(); };
+  document.getElementById('vSfx').oninput = (e) => { ready(); Sound.volume.sfx = Number(e.target.value); Sound.applyVolume(); };
+</script>
+</body>
+</html>

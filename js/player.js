@@ -199,6 +199,7 @@ class Player {
     const up = this.abUp;
     game.run.abilities++;
     this.auraT = 1;
+    Sound.play(ab.id === 'block' ? 'block' : 'ability');
     switch (ab.id) {
       case 'block':
         this.blockT = up ? up.duration : ab.duration;
@@ -298,6 +299,7 @@ class Player {
     this.ultCharge = 0;
     this.ultT = u.duration;
     game.run.ults++;
+    Sound.play('ult');
     this.ultTick = 0;
     game.shake = 4;
     if (u.id === 'storm') {
@@ -310,8 +312,10 @@ class Player {
       game.zones.push({ x: m.x, y: m.y, t: u.duration, max: u.duration, tick: 0, radius: u.radius, owner: this });
       game.fx.ring(m.x, m.y, '#ff9a3c', u.radius);
       this.castT = 0.3;
+      Sound.play('fire');
       const up = this.ultUpg;
       if (up && up.delay) { // Meteor schlägt in die Feuerzone ein
+        Sound.play('meteor');
         game.meteors.push({ x: m.x, y: m.y, t: up.delay, delay: up.delay, radius: u.radius, dmg: Math.round(this.rollDamage() * up.dmgFactor) });
       }
     }
@@ -351,6 +355,7 @@ class Player {
     const c = this.cls;
     const a = this.aim;
     if (c.attack === 'melee') {
+      Sound.play('swing');
       this.swing = { t: 0, dur: 0.16, a };
       for (const e of game.enemies) {
         if (e.dead) continue;
@@ -365,6 +370,7 @@ class Player {
     const ice = this.iceShots > 0;
     if (ice) this.iceShots--;
     this.fireProjectile(game, a, { ice });
+    Sound.play(c.attack === 'orb' ? 'orb' : 'arrow');
     if (c.attack === 'orb') this.castT = 0.2;
   }
 
@@ -430,6 +436,7 @@ class Player {
     this.lastHit = game.time;
     game.run.dmgTaken += Math.min(amount, amount + this.hp);
     if (src) game.run.lastHitBy = src;
+    Sound.play(tick ? 'poison' : 'hurt');
     if (tick) {
       game.fx.text(this.x, this.y - 12, `-${amount}`, '#9be05a');
     } else {

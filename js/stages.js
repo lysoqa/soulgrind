@@ -6,9 +6,9 @@
 // replace = Gegnertyp austauschen (Liste = zufällig einer davon), weightMul = Häufigkeit ändern,
 // pillars = Steinsäulen erscheinen. Nach dem Boss der letzten Ebene hat man gewonnen.
 const STAGES = [
-  { name: 'Wald', ground: 'grass', duration: 300, boss: 'volghard', levelBonus: 0, replace: {}, pillars: false },
+  { name: 'Wald', music: 'forest', ground: 'grass', duration: 300, boss: 'volghard', levelBonus: 0, replace: {}, pillars: false },
   {
-    name: 'Katakomben', ground: 'crypt', duration: 420, boss: 'elmatho', levelBonus: 2, pillars: true,
+    name: 'Katakomben', music: 'catacombs', ground: 'crypt', duration: 420, boss: 'elmatho', levelBonus: 2, pillars: true,
     replace: { zombie: 'troll', skeleton: ['rat', 'wight'] }, // Skelett-Plätze: halb Ratten, halb Wichte
     weightMul: { bat: 0.8 }, // etwas weniger Fledermäuse
   },
@@ -420,6 +420,7 @@ function spawnStageBoss(game) {
   game.enemies.push(e);
   game.stageBoss = e;
   game.shake = 8;
+  Sound.play('bossRoar');
   const col = id === 'elmatho' ? '#8a9a7a' : '#465428';
   game.fx.ring(e.x, e.y, col, 40);
   game.fx.burst(e.x, e.y, col, 40);
@@ -488,6 +489,7 @@ function updateElMatho(e, dt, game, ux, uy, d) {
   // Bodenstampfer: steht still, Warnkreis füllt sich, dann Schockwelle
   if (e.slamWind > 0) {
     if ((e.slamWind -= dt) <= 0) {
+      Sound.play('slam');
       if (Math.hypot(p.x - e.x, p.y - e.y) < ELMATHO.slamRadius + p.r) p.takeDamage(ELMATHO.slamDmg * dmgMul, game, { src: "El'Matho" });
       game.shake = 10;
       game.fx.ring(e.x, e.y, '#ff9a3c', ELMATHO.slamRadius);
@@ -500,6 +502,7 @@ function updateElMatho(e, dt, game, ux, uy, d) {
   if ((e.slamT -= dt) <= 0 && d < ELMATHO.slamRadius * 1.5) {
     e.slamWind = ELMATHO.slamWindup * (e.enraged ? 0.8 : 1);
     e.slamMax = e.slamWind;
+    Sound.play('slamWarn');
     return { x: 0, y: 0 };
   }
 
@@ -558,6 +561,7 @@ function updateHazards(dt, game) {
     if (h.t > 0) continue;
     if (p && Math.hypot(p.x - h.x, p.y - h.y) < h.radius + p.r) p.takeDamage(h.dmg, game, { src: h.src });
     game.shake = Math.max(game.shake, 4);
+    Sound.play('rock');
     game.fx.ring(h.x, h.y, '#8c8c96', h.radius);
     game.fx.burst(h.x, h.y, '#6d6d78', 14);
   }
@@ -620,6 +624,7 @@ function updatePillars(dt, game) {
     if (x < 20 || y < 20 || x > WORLD - 20 || y > WORLD - 20) continue;
     if (game.pillars.some((o) => Math.hypot(o.x - x, o.y - y) < PILLAR.spacing)) continue;
     game.pillars.push({ x, y, age: 0, draw: drawPillar });
+    Sound.play('pillar');
     return;
   }
 }

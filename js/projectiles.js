@@ -55,6 +55,7 @@ function updateProjectiles(dt, game) {
 // Eispfeil friert ein, Sturmwalze verlangsamt
 function applyHitEffects(e, p) {
   if (p.freeze) {
+    Sound.play('freeze');
     const t = e.boss ? p.freeze / 2 : p.freeze;
     e.stunT = Math.max(e.stunT, t);
     e.frozenT = Math.max(e.frozenT, t);
@@ -83,6 +84,7 @@ function reflectProjectile(p, pl, game) {
   p.knockback = 4;
   p.poison = null;
   game.run.reflects++; // für den Krieger-Erfolg
+  Sound.play('block');
   game.fx.burst(p.x, p.y, '#7fd4ff', 5);
 }
 
