@@ -2,7 +2,7 @@
 // (Feuerspur, Rankenpfad, Meteor). Alle Werte stehen hier oben gebündelt.
 
 const LOOT = {
-  goldChance: 0.5, // Chance auf 1 Gold pro Gegner
+  goldChance: 0.2, // Chance auf 1 Gold pro Gegner
   goldMiniBoss: 10, // Mini-Boss lässt so viel Gold fallen
   goldStageBoss: { volghard: 25, elmatho: 40 }, // Ebenen-Bosse
   goldLife: 30, // Sekunden, bis eine Münze verschwindet

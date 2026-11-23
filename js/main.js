@@ -1,5 +1,5 @@
 // Spielschleife, Kamera, Effekte und Spielzustände (Auswahl, Spielen, Tod)
-const GAME_VERSION = '0.7.0';
+const GAME_VERSION = '0.7.1';
 const W = 384;
 const H = 216;
 const WORLD = 1600;

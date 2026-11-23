@@ -60,12 +60,12 @@ Der Launcher startet das Spiel bei `npm start` direkt aus `../Soulgrind-Game`. I
 - **Rundentimer:** je länger, desto mehr Gegner. Alle 3 Minuten ein Mini-Boss **ohne Ankündigung**, nur größer und stärker.
 - **Ebenen:** Ebene 1 (Wald) 5 Min., dann Timer-Stopp, Rest besiegen, Boss Volghard (toter, düsterer Baum, Dornen, Pflanzen). Danach „Ebene geschafft“ mit Upgrade-Wahl, gleicher Held in Ebene 2 **Katakomben** (7 Min.): Trolle statt Zombies, Skelett-Plätze halb Ratten (Giftspucke 2/s für 5 s), halb Wichte (springen zu), etwas weniger Fledermäuse, animierte Steinsäulen im Bild. Boss **El'Matho, König der Trolle** (Bodenstampfer mit Warnkreis, Felswurf mit Schatten, ruft Trolle, Wut ab 50 %). Danach Sieg und zurück ins Menü. Ebene 3 kommt später.
 - **Gold-Upgrades (Menü):** 7 Upgrades, je 5 Stufen, Preise 25/50/100/175/300.
-- **Erfolge:** pro Klasse 4 (Spezial-Zähler, 500 Kills, 1000 Kills, Boss Ebene 3 noch gesperrt). Belohnungen = Skins, im Erfolge-Tab an-/ablegbar.
+- **Erfolge:** pro Klasse 4 (Spezial-Zähler 250, 5000 Kills, 10000 Kills, Boss Ebene 3 noch gesperrt). Belohnungen = Skins, im Erfolge-Tab an-/ablegbar.
 - **Statistik:** Reiter Insgesamt + jede Klasse. Lokal gespeichert. Online-Rangliste ist für ein eigenes späteres Update geplant (braucht einen Online-Speicher, z. B. Supabase, den der Nutzer anlegt).
 - **Discord-Link** im Hauptmenü: https://discord.gg/ad2RtwyGyv (der Launcher öffnet Links ab Spielhalle 0.3.0 im Browser).
 - **Auto-Schuss:** Q schaltet an/aus (alle Klassen, Ziel = Maus). Taste im Optionen-Menü änderbar.
 - **Hauptmenü:** Spielen / Upgrades / Erfolge / Statistik / Optionen, darunter der Discord-Link.
-- **Gold:** 50 % Chance auf 1 Gold pro Gegner, Mini-Boss 10, Volghard 25. Hinlaufen zum Einsammeln (Magnet). Gold einer Ebene ist erst sicher, wenn die Ebene geschafft ist. Stirbt man vorher, ist das Gold dieser Ebene weg. Gesamt-Gold für alle Klassen, im Hauptmenü sichtbar.
+- **Gold:** 20 % Chance auf 1 Gold pro Gegner, Mini-Boss 10, Volghard 25. Hinlaufen zum Einsammeln (Magnet). Gold einer Ebene ist erst sicher, wenn die Ebene geschafft ist. Stirbt man vorher, ist das Gold dieser Ebene weg. Gesamt-Gold für alle Klassen, im Hauptmenü sichtbar.
 - **Herzen:** 8 % pro Gegner, heilen 20, liegen 15 s.
 - **Fledermaus-Schwarm:** selten, 6 bis 9 Fledermäuse fliegen schnell geradeaus durch, sterben mit einem Treffer, wenig XP, wenig Schaden.
 - **Krieger:** Schildblock und Wirbelschlag werfen gegnerische Geschosse zurück.

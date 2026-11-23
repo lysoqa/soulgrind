@@ -75,6 +75,8 @@ Neue wichtige Entscheidungen bitte unten ergänzen.
   - **Ebene 2 heißt jetzt Katakomben:** 7 Minuten, siehe Spielregeln in CLAUDE.md. El'Matho gibt 40 Gold.
   - **Online-Rangliste:** Der Nutzer will sie, aber als eigenes späteres Update (Supabase-Account nötig, Schummeln wäre möglich, Spieler bräuchten einen öffentlichen Namen).
 
+- **v0.7.1:** Gold-Chance pro Gegner von 50 % auf 20 % gesenkt. Kill-Erfolge von 500/1000 auf 5000/10000 Kills erhöht (Wunsch des Nutzers).
+
 ## Offene Punkte und Ideen
 - **Ebene 3** mit Boss (laut Erfolgen ein Kraken) und die Ebene-3-Erfolge (Krone + Titel) fehlen noch.
 - **Online-Rangliste** als eigenes Update.

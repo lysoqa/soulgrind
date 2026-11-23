@@ -3,20 +3,20 @@
 const ACHIEVEMENTS = {
   warrior: [
     { id: 'w_reflect', name: 'Spiegelmeister', desc: 'Reflektiere 250 Schüsse', stat: 'reflects', goal: 250, reward: 'goldShield' },
-    { id: 'w_kill500', name: 'Schlächter', desc: 'Töte 500 Monster', stat: 'kills', goal: 500, reward: 'blueShirt' },
-    { id: 'w_kill1000', name: 'Kriegsherr', desc: 'Töte 1000 Monster', stat: 'kills', goal: 1000, reward: 'goldSword' },
+    { id: 'w_kill5000', name: 'Schlächter', desc: 'Töte 5000 Monster', stat: 'kills', goal: 5000, reward: 'blueShirt' },
+    { id: 'w_kill10000', name: 'Kriegsherr', desc: 'Töte 10000 Monster', stat: 'kills', goal: 10000, reward: 'goldSword' },
     { id: 'w_stage3', name: 'Kraken Bezwinger', desc: 'Besiege den Boss von Ebene 3', locked: true, reward: 'crown' },
   ],
   archer: [
     { id: 'a_pierce', name: 'Durchschlag', desc: 'Durchbohre 250 mal mindestens 2 Gegner mit einem Pfeil', stat: 'pierce2', goal: 250, reward: 'goldAura' },
-    { id: 'a_kill500', name: 'Jäger', desc: 'Töte 500 Monster', stat: 'kills', goal: 500, reward: 'goldArrows' },
-    { id: 'a_kill1000', name: 'Meisterschütze', desc: 'Töte 1000 Monster', stat: 'kills', goal: 1000, reward: 'goldBow' },
+    { id: 'a_kill5000', name: 'Jäger', desc: 'Töte 5000 Monster', stat: 'kills', goal: 5000, reward: 'goldArrows' },
+    { id: 'a_kill10000', name: 'Meisterschütze', desc: 'Töte 10000 Monster', stat: 'kills', goal: 10000, reward: 'goldBow' },
     { id: 'a_stage3', name: 'Phantomtänzer', desc: 'Besiege den Boss von Ebene 3', locked: true, reward: 'crown' },
   ],
   mage: [
     { id: 'm_banish', name: 'Bannmeister', desc: 'Verbanne 250 Gegner mit deiner Fähigkeit', stat: 'banished', goal: 250, reward: 'goldParticles' },
-    { id: 'm_kill500', name: 'Hexer', desc: 'Töte 500 Monster', stat: 'kills', goal: 500, reward: 'goldOrbs' },
-    { id: 'm_kill1000', name: 'Erzmagier', desc: 'Töte 1000 Monster', stat: 'kills', goal: 1000, reward: 'goldBook' },
+    { id: 'm_kill5000', name: 'Hexer', desc: 'Töte 5000 Monster', stat: 'kills', goal: 5000, reward: 'goldOrbs' },
+    { id: 'm_kill10000', name: 'Erzmagier', desc: 'Töte 10000 Monster', stat: 'kills', goal: 10000, reward: 'goldBook' },
     { id: 'm_stage3', name: 'Schattenflamme', desc: 'Besiege den Boss von Ebene 3', locked: true, reward: 'crown' },
   ],
 };
