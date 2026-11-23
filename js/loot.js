@@ -4,7 +4,7 @@
 const LOOT = {
   goldChance: 0.5, // Chance auf 1 Gold pro Gegner
   goldMiniBoss: 10, // Mini-Boss lässt so viel Gold fallen
-  goldStageBoss: 25, // Ebenen-Boss (Volghard)
+  goldStageBoss: { volghard: 25, elmatho: 40 }, // Ebenen-Bosse
   goldLife: 30, // Sekunden, bis eine Münze verschwindet
   heartChance: 0.08, // Chance auf ein Herz pro Gegner
   heartHeal: 20,
@@ -54,10 +54,11 @@ SPR.meteor = makeSprite([
 
 function dropLoot(game, e) {
   if (e.type === ENEMY_TYPES.plant) return; // Pflanzen lassen nichts fallen (Volghard macht ständig neue)
+  const find = 1 + Meta.bonus('goldFind'); // Goldfund-Upgrade aus dem Menü
   let gold = 0;
-  if (e.bossBar) gold = LOOT.goldStageBoss;
-  else if (e.boss) gold = LOOT.goldMiniBoss;
-  else if (Math.random() < LOOT.goldChance) gold = 1;
+  if (e.bossBar) gold = Math.round((LOOT.goldStageBoss[Object.keys(ENEMY_TYPES).find((k) => ENEMY_TYPES[k] === e.type)] || 25) * find);
+  else if (e.boss) gold = Math.round(LOOT.goldMiniBoss * find);
+  else if (Math.random() < Math.min(1, LOOT.goldChance * find)) gold = 1;
   for (let i = 0; i < gold; i++) spawnPickup(game, 'gold', e.x, e.y, gold > 1);
   if (!e.boss && Math.random() < LOOT.heartChance) spawnPickup(game, 'heart', e.x, e.y, false);
 }
@@ -78,6 +79,7 @@ function collectPickup(game, pk) {
     game.fx.text(p.x, p.y - 14, '+1 Gold', '#ffd34a');
   } else {
     p.hp = Math.min(p.maxHp, p.hp + LOOT.heartHeal);
+    game.run.hearts++;
     game.fx.text(p.x, p.y - 14, `+${LOOT.heartHeal}`, '#7fe07f');
     game.fx.burst(p.x, p.y, '#e04848', 8);
   }

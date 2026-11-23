@@ -6,7 +6,8 @@ function updateProjectiles(dt, game) {
     p.life -= dt;
 
     if (p.kind === 'orb' && Math.random() < (p.small ? 0.3 : 0.7)) {
-      game.fx.particle(p.x, p.y, Math.random() < 0.5 ? '#b07cff' : '#e0ccff', 0.3, 10);
+      const cols = p.gold ? ['#ffd34a', '#fff4c2'] : ['#b07cff', '#e0ccff'];
+      game.fx.particle(p.x, p.y, cols[Math.random() < 0.5 ? 0 : 1], 0.3, 10);
     }
     if (p.kind === 'tornado' && Math.random() < 0.8) {
       game.fx.particle(p.x + (Math.random() - 0.5) * p.r * 2, p.y + p.r * 0.6, '#9fb0c2', 0.4, 15);
@@ -23,6 +24,7 @@ function updateProjectiles(dt, game) {
           applyHitEffects(e, p);
           game.hitEnemy(e, p.dmg, ang, p.knockback);
           p.hit.add(e);
+          if (p.kind === 'arrow' && p.hit.size === 2) game.run.pierce2++; // für den Schützen-Erfolg
           if (--p.pierce <= 0) p.dead = true;
         }
         break;
@@ -35,8 +37,13 @@ function updateProjectiles(dt, game) {
       if (reflect && dist < reflect + p.r) {
         reflectProjectile(p, pl, game);
       } else if (dist < pl.r + p.r && !pl.projectileImmune) {
-        const hit = pl.takeDamage(p.dmg, game);
-        if (hit && p.poison) pl.poisonT = POISON.duration; // Gift startet neu, stapelt sich nicht
+        const hit = pl.takeDamage(p.dmg, game, { src: p.src });
+        if (hit && p.poison) { // Gift startet neu, stapelt sich nicht
+          const po = p.poison === true ? POISON : p.poison;
+          pl.poisonT = po.duration;
+          pl.poisonDmg = po.tickDmg;
+          pl.poisonSrc = `Gift (${p.src || 'Gegner'})`;
+        }
         p.dead = true;
       }
     }
@@ -75,6 +82,7 @@ function reflectProjectile(p, pl, game) {
   p.aoe = 0;
   p.knockback = 4;
   p.poison = null;
+  game.run.reflects++; // für den Krieger-Erfolg
   game.fx.burst(p.x, p.y, '#7fd4ff', 5);
 }
 
@@ -105,17 +113,30 @@ function drawProjectiles(ctx, cam, game) {
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(sx - 1, sy - 1, 2, 2);
     } else if (p.kind === 'arrow') {
-      drawRotated(ctx, p.freeze ? SPR.iceArrow : SPR.arrow, sx, sy, Math.atan2(p.vy, p.vx), -4);
+      drawRotated(ctx, p.freeze ? SPR.iceArrow : p.gold ? SKIN_SPR.goldArrow : SPR.arrow, sx, sy, Math.atan2(p.vy, p.vx), -4);
     } else if (p.kind === 'tornado') {
       const wob = Math.round(Math.sin(game.time * 25) * 1.5);
       ctx.fillStyle = 'rgba(0,0,0,0.25)';
       ctx.fillRect(sx - 6, sy + 8, 13, 2);
       drawSprite(ctx, SPR.tornado, sx + wob, sy - 1, { scale: 2, flip: Math.floor(game.time * 12) % 2 === 0 });
     } else if (p.kind === 'orb' && p.small) {
-      ctx.fillStyle = 'rgba(176,124,255,0.5)';
+      ctx.fillStyle = p.gold ? 'rgba(255,211,74,0.5)' : 'rgba(176,124,255,0.5)';
       ctx.fillRect(sx - 2, sy - 2, 5, 5);
-      ctx.fillStyle = '#e0ccff';
+      ctx.fillStyle = p.gold ? '#fff4c2' : '#e0ccff';
       ctx.fillRect(sx - 1, sy - 1, 3, 3);
+    } else if (p.kind === 'orb' && p.gold) {
+      ctx.fillStyle = 'rgba(255,211,74,0.5)';
+      ctx.fillRect(sx - 3, sy - 3, 7, 7);
+      ctx.fillStyle = '#ffd34a';
+      ctx.fillRect(sx - 2, sy - 2, 5, 5);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(sx - 1, sy - 1, 3, 3);
+    } else if (p.kind === 'venom') {
+      // Giftspucke der Ratten
+      ctx.fillStyle = '#1a1420';
+      ctx.fillRect(sx - 2, sy - 2, 4, 4);
+      ctx.fillStyle = '#b6e04a';
+      ctx.fillRect(sx - 1, sy - 1, 2, 2);
     } else if (p.kind === 'thorn') {
       drawRotated(ctx, SPR.thorn, sx, sy, Math.atan2(p.vy, p.vx), -3);
     } else if (p.kind === 'seed') {

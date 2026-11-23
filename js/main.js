@@ -1,5 +1,5 @@
 // Spielschleife, Kamera, Effekte und Spielzustände (Auswahl, Spielen, Tod)
-const GAME_VERSION = '0.6.0';
+const GAME_VERSION = '0.7.0';
 const W = 384;
 const H = 216;
 const WORLD = 1600;
@@ -89,6 +89,8 @@ const game = {
     this.runRecorded = false;
     this.runGold = 0;
     this.bankedGold = 0;
+    this.run = Tracker.newRun(); // Statistik dieses Runs
+    this.newAchievements = [];
     this.enterStage(0);
   },
 
@@ -107,6 +109,7 @@ const game = {
     this.pickups = [];
     this.groundFx = [];
     this.meteors = [];
+    this.hazards = [];
     this.runGold = 0;
     this.swarmT = SWARM.firstAfter;
     this.pillarT = 3;
@@ -136,6 +139,8 @@ const game = {
     this.projectiles = [];
     this.zones = [];
     this.meteors = [];
+    this.hazards = [];
+    this.run.stagesCleared++;
     // liegengebliebenes Gold (auch das vom Boss) wird automatisch eingesammelt
     for (const pk of this.pickups) if (pk.kind === 'gold') this.runGold++;
     this.pickups = [];
@@ -149,6 +154,18 @@ const game = {
     this.upgradeHover = -1;
     const p = this.player;
     const newBest = !this.devUsed && Records.submitStage(p.cls.id, this.stage + 1, this.runTime, true);
+    if (this.stageBoss && this.stageBoss.fightTime) {
+      const t = this.stageBoss.fightTime;
+      if (!this.run.fastestBoss || t < this.run.fastestBoss) this.run.fastestBoss = t;
+    }
+    // Boss der letzten Ebene besiegt: gewonnen!
+    if (!STAGES[this.stage + 1]) {
+      this.state = 'victory';
+      this.deadT = 0;
+      this.lastClear = { stage: this.stage + 1, boss: this.stageBoss ? this.stageBoss.type.name : null, gold, newBest, options: [] };
+      this.finishRun('win');
+      return;
+    }
     // Upgrade-Wahl: Fähigkeit oder Ult (nur was noch nicht gewählt wurde)
     const options = [];
     if (!p.abilityUp && p.ability.upgrade) options.push({ kind: 'ability', base: p.ability, up: p.ability.upgrade });
@@ -185,14 +202,18 @@ const game = {
     }
   },
 
-  // Run endet (Tod oder Abbruch): Zeit der aktuellen Ebene und Kills speichern
-  recordRun() {
+  // Run endet (Tod, Abbruch oder Sieg): Spielstand, Statistik und Erfolge eintragen.
+  // Gibt zurück, ob es eine neue Bestzeit ist.
+  finishRun(result) {
     if (this.runRecorded || !this.player) return false;
     this.runRecorded = true;
     if (this.devUsed) return false;
     const id = this.player.cls.id;
     Records.addKills(id, this.player.kills);
-    return Records.submitStage(id, this.stage + 1, this.runTime, false);
+    const newBest = result !== 'win' && Records.submitStage(id, this.stage + 1, this.runTime, false);
+    Tracker.commitRun(this, result);
+    this.newAchievements = Cosmetics.checkNew(id);
+    return newBest;
   },
 
   // ---------- Developer-Modus (F1) ----------
@@ -200,7 +221,7 @@ const game = {
   devAction(n) {
     const p = this.player;
     const actions = {
-      1: () => { if (STAGES[this.stage + 1]) this.stageCleared(); }, // wie geschafft, mit Upgrade-Wahl
+      1: () => this.stageCleared(), // wie geschafft (mit Upgrade-Wahl, nach der letzten Ebene: Sieg)
       2: () => { if (this.stageDef.duration && this.phase === 'waves') this.runTime = this.stageDef.duration - 5; },
       3: () => p.gainXp((xpForLevel(p.level) - p.xp + 0.01) / (1 + p.bonus('xpGain')), this),
       4: () => { p.ultCharge = 1; },
@@ -247,11 +268,38 @@ const game = {
   updateMenu() {
     const btns = menuButtons();
     this.menuHover = btns.findIndex((b) => inRect(Input.mouse, b));
+    if (Input.leftPressed && inRect(Input.mouse, discordRect())) { openDiscord(); return; }
     if (!Input.leftPressed || this.menuHover < 0) return;
     const b = btns[this.menuHover];
-    if (b.soon) return; // kommt bald, nicht anklickbar
     if (b.id === 'play') this.state = 'select';
-    if (b.id === 'options') { this.state = 'options'; this.rebinding = false; this.optionsMsg = ''; }
+    else this.openTab(b.id);
+  },
+
+  // Unterseiten des Hauptmenüs: upgrades | achievements | stats | options
+  openTab(id) {
+    this.state = id;
+    this.tab = 0; // Klassen-Reiter bei Erfolgen und Statistik
+    this.rebinding = false;
+    this.optionsMsg = '';
+  },
+
+  // Gemeinsame Steuerung der Unterseiten: Zurück, Reiter, Klicks
+  updateTab() {
+    if (this.state === 'options') { this.updateOptions(); return; }
+    if (Input.wasPressed('Escape') || (Input.leftPressed && inRect(Input.mouse, backRect()))) { this.state = 'menu'; return; }
+    const tabs = tabRects(this.state);
+    const t = tabs.findIndex((r) => inRect(Input.mouse, r));
+    if (Input.leftPressed && t >= 0) { this.tab = t; return; }
+    if (!Input.leftPressed) return;
+    if (this.state === 'upgrades') {
+      const i = metaRowRects().findIndex((r) => inRect(Input.mouse, r.buy));
+      if (i >= 0 && Meta.buy(META.upgrades[i].id)) this.menuFlash = { i, t: this.time };
+    } else if (this.state === 'achievements') {
+      const cls = CLASS_ORDER[this.tab];
+      const i = achievementRows().findIndex((r) => inRect(Input.mouse, r.btn));
+      const a = ACHIEVEMENTS[cls][i];
+      if (a && achievementDone(cls, a)) Cosmetics.toggle(cls, a.reward);
+    }
   },
 
   updateOptions() {
@@ -278,6 +326,10 @@ const game = {
 
   hitEnemy(e, dmg, angle, knockback) {
     if (e.dead) return;
+    if (this.run) { // Statistik: Schaden und höchster Einzeltreffer
+      this.run.dmgDealt += Math.max(0, Math.min(dmg, e.hp));
+      this.run.maxHit = Math.max(this.run.maxHit, dmg);
+    }
     e.hp -= dmg;
     e.flash = 0.08;
     const kb = e.type.anchored ? 0 : e.boss ? knockback * 0.2 : knockback;
@@ -290,15 +342,18 @@ const game = {
       this.player.kills++;
       this.player.onKill();
       dropLoot(this, e);
+      this.run.kills++;
+      this.run.killsByType[e.type.name] = (this.run.killsByType[e.type.name] || 0) + 1;
       if (e.boss) {
         this.bossKills++;
+        this.run.bosses++;
         this.shake = 6;
         this.fx.ring(e.x, e.y, '#ffd34a', 40);
       }
       this.fx.burst(e.x, e.y, e.type.blood, e.boss ? 40 : 12);
       this.fx.text(e.x, e.y - 4, `+${Math.round(e.xp * (1 + this.player.bonus('xpGain')))} XP`, '#ffd34a');
       this.player.gainXp(e.xp, this);
-      if (e === this.stageBoss) this.stageCleared();
+      if (e === this.stageBoss && this.state === 'play') this.stageCleared(); // nicht mehr, wenn der Held schon tot ist
     }
   },
 
@@ -322,7 +377,7 @@ const game = {
   pickStat(i) {
     const id = this.choice && this.choice.options[i];
     if (!id) return;
-    this.player.addStat(id);
+    this.player.addStat(id, this);
     this.fx.text(this.player.x, this.player.y - 16, `${STATS[id].name} ${this.player.rank(id)}`, '#b07cff');
     this.choice = null;
     this.pendingChoices--;
@@ -333,6 +388,7 @@ const game = {
   reroll() {
     if (!this.choice || this.player.rerolls <= 0) return;
     this.player.rerolls--;
+    this.run.rerolls++;
     this.choice.options = rollStatOptions(this.player, this.choice.options);
   },
 
@@ -364,7 +420,7 @@ const game = {
 
   // Run abbrechen und zurück ins Hauptmenü (der Held ist danach weg)
   abortRun() {
-    this.recordRun();
+    this.finishRun('abort');
     this.paused = false;
     this.choice = null;
     this.pendingChoices = 0;
@@ -380,10 +436,10 @@ const game = {
     this.deadT = 0;
     this.choice = null;
     this.devMenu = false;
-    const newBest = this.recordRun();
+    const newBest = this.finishRun('death');
     this.lastRun = {
       cls: p.cls.name, level: p.level, kills: p.kills, bosses: this.bossKills, time: this.runTime, stage: this.stage + 1, newBest, dev: this.devUsed,
-      goldLost: this.runGold, goldKept: this.bankedGold,
+      goldLost: this.runGold, goldKept: this.bankedGold, killer: this.run.lastHitBy,
     };
     this.fx.burst(p.x, p.y, '#d93a4a', 30);
   },
@@ -409,7 +465,7 @@ const game = {
     this.time += dt;
 
     if (this.state === 'menu') { this.updateMenu(); return; }
-    if (this.state === 'options') { this.updateOptions(); return; }
+    if (MENU_TABS.includes(this.state)) { this.updateTab(); return; }
 
     if (this.state === 'select') {
       if (Input.wasPressed('Escape') || (Input.leftPressed && inRect(Input.mouse, backRect()))) { this.state = 'menu'; return; }
@@ -443,18 +499,21 @@ const game = {
 
     if (this.state === 'play') {
       if (Input.wasPressed(Settings.autoFireKey)) this.toggleAutoFire();
+      this.run.playTime += dt;
+      if (this.stageBoss && !this.stageBoss.dead) this.stageBoss.fightTime += dt;
       this.player.update(dt, this);
       this.updateZones(dt);
       updateGroundFx(dt, this);
+      updateHazards(dt, this);
       updateSwarm(dt, this);
       this.updatePhase(dt);
     }
 
     if (this.state === 'cleared') this.updateCleared(dt);
 
-    if (this.state === 'dead') {
+    if (this.state === 'dead' || this.state === 'victory') {
       this.deadT += dt;
-      if (this.deadT > 1.2 && Input.leftPressed) this.state = 'menu';
+      if (this.deadT > 1.5 && Input.leftPressed) { this.state = 'menu'; Input.leftPressed = false; }
     }
 
     for (const e of this.enemies) if (!e.dead) e.update(dt, this);
@@ -519,11 +578,11 @@ const game = {
   },
 
   draw() {
-    if (['menu', 'options', 'select', 'ability'].includes(this.state)) {
+    if (this.state === 'menu' || this.state === 'select' || this.state === 'ability' || MENU_TABS.includes(this.state)) {
       if (this.state === 'menu') drawMenu(ctx, this);
-      else if (this.state === 'options') drawOptions(ctx, this);
       else if (this.state === 'select') drawSelect(ctx, this);
-      else drawAbilitySelect(ctx, this);
+      else if (this.state === 'ability') drawAbilitySelect(ctx, this);
+      else drawTab(ctx, this);
       drawCrosshair(ctx);
       return;
     }
@@ -532,6 +591,7 @@ const game = {
       y: Math.round(this.cam.y + (Math.random() - 0.5) * this.shake),
     };
     if (this.stageDef.ground === 'stone') drawStoneGround(ctx, cam);
+    else if (this.stageDef.ground === 'crypt') drawCryptGround(ctx, cam);
     else drawGround(ctx, cam);
     drawPillarZones(ctx, cam, this);
     drawFireZones(ctx, cam, this);
@@ -544,6 +604,7 @@ const game = {
     for (const a of actors) a.draw(ctx, cam, this);
 
     drawProjectiles(ctx, cam, this);
+    drawHazards(ctx, cam, this);
 
     for (const pt of this.particles) {
       ctx.globalAlpha = Math.min(1, pt.life / pt.max + 0.2);
@@ -578,6 +639,8 @@ const game = {
       else if (this.paused) drawPause(ctx, this);
     } else if (this.state === 'cleared') {
       drawStageClear(ctx, this);
+    } else if (this.state === 'victory') {
+      drawVictory(ctx, this);
     } else {
       drawDead(ctx, this);
     }
@@ -586,6 +649,15 @@ const game = {
 };
 
 const inRect = (m, r) => m.x >= r.x && m.x < r.x + r.w && m.y >= r.y && m.y < r.y + r.h;
+
+// Unterseiten des Hauptmenüs
+const MENU_TABS = ['upgrades', 'achievements', 'stats', 'options'];
+
+// Discord-Einladung (öffnet sich im Browser bzw. in der Discord-App)
+const DISCORD_URL = 'https://discord.gg/ad2RtwyGyv';
+function openDiscord() {
+  try { window.open(DISCORD_URL, '_blank'); } catch (e) { /* ohne Fenster geht es nicht */ }
+}
 
 // Developer-Modus nur, wenn das Spiel direkt aus dem Projektordner läuft (nicht in installierten Versionen)
 const DEV_MODE = /\/Soulgrind-Game\//i.test(decodeURI(location.href));

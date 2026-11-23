@@ -87,6 +87,9 @@ class Enemy {
     this.dead = false;
   }
 
+  // Name für die Todesursache in der Statistik
+  get srcName() { return this.boss && !this.bossBar ? `${this.type.name} (Mini-Boss)` : this.type.name; }
+
   update(dt, game) {
     const p = game.player;
     const t = this.type;
@@ -122,7 +125,7 @@ class Enemy {
       if ((this.flyT -= dt) <= 0) { this.dead = true; this.silent = true; return; }
       if (this.stunT > 0) this.stunT -= dt;
       else if (Math.hypot(p.x - this.x, p.y - this.y) < this.r + p.r && this.contactT <= 0) {
-        p.takeDamage(this.contact, game);
+        p.takeDamage(this.contact, game, { src: this.srcName });
         this.contactT = 99; // jede Fledermaus trifft höchstens einmal
       }
       return;
@@ -144,7 +147,7 @@ class Enemy {
         const ex = this.x + Math.cos(this.beamAngle) * len;
         const ey = this.y + Math.sin(this.beamAngle) * len;
         if (!this.beamHit && distToSegment(p.x, p.y, this.x, this.y, ex, ey) < p.r + b.width * this.scale) {
-          p.takeDamage(this.beamDmg, game);
+          p.takeDamage(this.beamDmg, game, { src: this.srcName });
           this.beamHit = true;
         }
         if ((this.beamT -= dt) <= 0) { this.beamState = null; this.beamCd = b.cd * (0.8 + Math.random() * 0.4); }
@@ -162,6 +165,27 @@ class Enemy {
     } else if (t.tree) {
       const m = updateVolghard(this, dt, game, ux, uy);
       mx = m.x; my = m.y;
+    } else if (t.king) {
+      const m = updateElMatho(this, dt, game, ux, uy, d);
+      mx = m.x; my = m.y;
+    } else if (t.lunge) {
+      // Wicht: läuft schnell heran, holt kurz aus und springt dann blitzschnell zu
+      const L = t.lunge;
+      this.lungeCd = (this.lungeCd ?? 0.5) - dt;
+      if (this.lungeState === 'windup') {
+        mx = 0; my = 0;
+        if ((this.lungeT -= dt) <= 0) { this.lungeState = 'dash'; this.lungeT = L.time; this.lungeDir = { x: ux, y: uy }; }
+      } else if (this.lungeState === 'dash') {
+        mx = 0; my = 0;
+        this.x += this.lungeDir.x * L.speed * dt;
+        this.y += this.lungeDir.y * L.speed * dt;
+        if (Math.random() < 0.8) game.fx.particle(this.x, this.y, '#8a8fb0', 0.3, 6);
+        if ((this.lungeT -= dt) <= 0) { this.lungeState = null; this.lungeCd = L.cd; }
+      } else if (d < L.range && this.lungeCd <= 0) {
+        this.lungeState = 'windup';
+        this.lungeT = L.windup;
+        mx = 0; my = 0;
+      }
     } else if (t.ranged) {
       if (d > t.ranged.dist + 15) { mx = ux; my = uy; }
       else if (d < t.ranged.dist - 15) { const k = t.ranged.retreat || 1; mx = -ux * k; my = -uy * k; }
@@ -203,7 +227,7 @@ class Enemy {
     }
 
     if (t.contact && touching && this.contactT <= 0 && this.stunT <= 0) {
-      p.takeDamage(this.contact, game);
+      p.takeDamage(this.contact, game, { src: this.srcName });
       this.contactT = 0.8;
       // nach dem Treffer kurz zurückprallen, statt am Helden zu kleben
       const push = this.boss ? 4 : 12;
@@ -221,7 +245,7 @@ class Enemy {
       const a = angle + (i - (shots - 1) / 2) * 0.25;
       game.projectiles.push({
         friendly: false, kind: r.kind || 'bullet', x: this.x, y: this.y,
-        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: (r.range || 200) / sp, r: this.boss ? 3 : 2,
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: (r.range || 200) / sp, r: this.boss ? 3 : 2, src: this.srcName,
         dmg: r.fixedDmg || this.bulletDmg, poison: r.poison || null,
       });
     }
@@ -260,6 +284,7 @@ class Enemy {
         ctx.stroke();
       }
     }
+    if (this.type.king) drawElMathoWarnings(this, ctx, cam, game); // Warnkreis des Bodenstampfers
     // Volghard zittert kurz, bevor er Dornen schießt
     const shakeX = this.windupT > 0 ? Math.round(Math.sin(game.time * 60)) : 0;
     const look = { flip: this.facing < 0, white: this.flash > 0, scale: this.scale };
@@ -271,6 +296,10 @@ class Enemy {
       drawTint(ctx, spr, sx + shakeX, sy + hover, look, '#7fd4ff', 0.6);
     } else if (this.slowT > 0 && this.slowMul < 1 && this.flash <= 0) {
       drawTint(ctx, spr, sx + shakeX, sy + hover, look, '#62a050', 0.35);
+    } else if (this.lungeState === 'windup' && Math.floor(game.time * 20) % 2 === 0) {
+      drawTint(ctx, spr, sx, sy, look, '#ffffff', 0.6); // Wicht holt aus
+    } else if (this.enraged && this.flash <= 0) {
+      drawTint(ctx, spr, sx + shakeX, sy + hover, look, '#ff2a2a', 0.3 + 0.15 * Math.sin(game.time * 8)); // El'Matho in Wut
     }
 
     if (this.frozenT > 0) {
@@ -298,12 +327,21 @@ class Enemy {
 // Skelette werden ab dieser Rundenzeit seltener (sonst schießen später zu viele gleichzeitig)
 const SKELETON_LATE = { from: 120, factor: 0.5 };
 
+// Austausch durch die Ebene: ein Typ (Zombie > Troll) oder eine Liste, aus der zufällig gewählt wird
+// (Skelett > halb Ratte, halb Wicht)
+function stageType(stage, id) {
+  const r = stage.replace[id];
+  if (!r) return id;
+  return Array.isArray(r) ? r[Math.floor(Math.random() * r.length)] : r;
+}
+
 // Wählt einen Gegnertyp passend zum Level (die Ebene kann Typen austauschen, z. B. Zombie > Troll)
 function pickEnemyType(level, stage, runTime = 0) {
   const skeletonMul = runTime >= SKELETON_LATE.from ? SKELETON_LATE.factor : 1;
+  const mul = stage.weightMul || {};
   const weights = {
     zombie: 45,
-    bat: 30 + level,
+    bat: (30 + level) * (mul.bat || 1),
     skeleton: level >= 2 ? (15 + level * 2) * skeletonMul : 0,
     lizard: level >= 3 ? 5 + level * 0.5 : 0, // selten, erst ab Gegnerlevel 3
   };
@@ -313,7 +351,7 @@ function pickEnemyType(level, stage, runTime = 0) {
   for (const [id, w] of Object.entries(weights)) {
     if ((r -= w) < 0) { pick = id; break; }
   }
-  return stage.replace[pick] || pick;
+  return stageType(stage, pick);
 }
 
 function spawnPoint(game) {
@@ -343,9 +381,10 @@ function spawnBoss(game, index) {
   if (!pt) return;
   // Mini-Boss aus den normalen Gegnern dieser Ebene (mit Austausch, z. B. Troll statt Zombie)
   const st = game.stageDef;
-  const types = [...new Set(Object.keys(ENEMY_TYPES).filter((id) => !ENEMY_TYPES[id].special && id !== 'troll').map((id) => st.replace[id] || id))];
+  const types = Object.keys(ENEMY_TYPES).filter((id) => !ENEMY_TYPES[id].special && !ENEMY_TYPES[id].stageOnly);
   const lvl = enemyLevel(game);
-  game.enemies.push(new Enemy(types[Math.floor(Math.random() * types.length)], lvl, pt.x, pt.y, index));
+  const id = stageType(st, types[Math.floor(Math.random() * types.length)]);
+  game.enemies.push(new Enemy(id, lvl, pt.x, pt.y, index));
 }
 
 // Mehr Gegner mit höherem Level und längerer Rundenzeit

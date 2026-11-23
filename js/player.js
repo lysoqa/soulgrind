@@ -20,8 +20,9 @@ class Player {
     this.xp = 0;
     this.stats = {}; // gewählte Stats: id -> Rang
     this.rerolls = REROLLS_PER_RUN;
-    this.maxHp = cls.hp;
+    this.maxHp = Math.round(cls.hp * (1 + Meta.bonus('maxHp')));
     this.hp = this.maxHp;
+    this.auraT = 0; // goldene Aura / Partikel nach einer Fähigkeit (Skin)
     this.aim = 0;
     this.cd = 0; // Angriffs-Abklingzeit
     this.abilityCd = 0; // Abklingzeit der Fähigkeit
@@ -51,7 +52,7 @@ class Player {
   // Aktive Upgrades (null, wenn nicht gewählt)
   get abUp() { return this.abilityUp ? this.ability.upgrade : null; }
   get ultUpg() { return this.ultUp ? this.ult.upgrade : null; }
-  get abilityCooldown() { return (this.abUp && this.abUp.cooldown) || this.ability.cooldown; }
+  get abilityCooldown() { return ((this.abUp && this.abUp.cooldown) || this.ability.cooldown) * (1 - Meta.bonus('cooldown')); }
   get projectileImmune() { return this.ultActive && !!this.ultUpg && !!this.ultUpg.projectileImmune; }
   ultValue(key) { return (this.ultUpg && this.ultUpg[key] !== undefined ? this.ultUpg[key] : this.ult[key]) || 0; }
 
@@ -75,20 +76,22 @@ class Player {
   rank(id) { return this.stats[id] || 0; }
   bonus(id) { return this.rank(id) * STATS[id].per; }
 
-  get dmgMul() { return (1 + this.cls.growth.dmg * (this.level - 1)) * (1 + this.bonus('damage')); }
-  get speed() { return this.cls.speed * (1 + this.bonus('moveSpeed')) * (this.ultActive ? 1 + this.ultValue('moveSpeed') : 1); }
+  get dmgMul() { return (1 + this.cls.growth.dmg * (this.level - 1)) * (1 + this.bonus('damage')) * (1 + Meta.bonus('damage')); }
+  get speed() { return this.cls.speed * (1 + this.bonus('moveSpeed')) * (1 + Meta.bonus('moveSpeed')) * (this.ultActive ? 1 + this.ultValue('moveSpeed') : 1); }
+  get xpMul() { return 1 + this.bonus('xpGain') + Meta.bonus('xpGain'); }
   get cooldown() { return this.cls.cooldown / (1 + this.bonus('attackSpeed') + (this.ultActive ? this.ultValue('attackSpeed') : 0)); }
   get projSpeed() { return this.cls.projSpeed * (1 + this.bonus('projSpeed')); }
   get abilityActive() { return this.blockT > 0 || !!this.spin || !!this.dash; }
 
   recalcMaxHp() {
     const old = this.maxHp;
-    this.maxHp = Math.round((this.cls.hp + this.cls.growth.hp * (this.level - 1)) * (1 + this.bonus('maxHp')));
+    this.maxHp = Math.round((this.cls.hp + this.cls.growth.hp * (this.level - 1)) * (1 + this.bonus('maxHp')) * (1 + Meta.bonus('maxHp')));
     this.hp = Math.min(this.maxHp, this.hp + Math.max(0, this.maxHp - old));
   }
 
-  addStat(id) {
+  addStat(id, game) {
     this.stats[id] = this.rank(id) + 1;
+    if (game && game.run) game.run.statPicks[STATS[id].name] = (game.run.statPicks[STATS[id].name] || 0) + 1;
     if (id === 'maxHp') this.recalcMaxHp();
   }
 
@@ -137,6 +140,17 @@ class Player {
     this.hurtT -= dt;
     this.castT -= dt;
     this.invulnT -= dt;
+    this.auraT -= dt;
+    // Skins: goldene Aura (Schütze) bzw. goldene Partikel (Magier) bei Fähigkeiten
+    if ((this.auraT > 0 || this.ultActive) && (Cosmetics.has('archer', 'goldAura') && this.cls.id === 'archer')) {
+      if (Math.random() < dt * 30) {
+        const a = Math.random() * Math.PI * 2;
+        game.fx.particle(this.x + Math.cos(a) * 7, this.y + Math.sin(a) * 7, Math.random() < 0.5 ? '#ffd34a' : '#fff4c2', 0.4, 6);
+      }
+    }
+    if ((this.auraT > 0 || this.ultActive) && (Cosmetics.has('mage', 'goldParticles') && this.cls.id === 'mage')) {
+      if (Math.random() < dt * 40) game.fx.particle(this.x + (Math.random() - 0.5) * 14, this.y - 4, Math.random() < 0.5 ? '#ffd34a' : '#fff4c2', 0.6, 25);
+    }
     this.blockT = Math.max(0, this.blockT - dt);
     this.abilityCd = Math.max(0, this.abilityCd - dt);
     if (this.swing && (this.swing.t += dt) >= this.swing.dur) this.swing = null;
@@ -152,7 +166,7 @@ class Player {
       if (Math.random() < dt * 6) game.fx.particle(this.x, this.y - 2, '#9be05a', 0.5, 12);
       if (this.poisonTick >= 1) {
         this.poisonTick -= 1;
-        this.takeDamage(POISON.tickDmg, game, { tick: true });
+        this.takeDamage(this.poisonDmg || POISON.tickDmg, game, { tick: true, src: this.poisonSrc || 'Gift' });
       }
     } else {
       this.poisonTick = 0;
@@ -183,6 +197,8 @@ class Player {
   useAbility(game) {
     const ab = this.ability;
     const up = this.abUp;
+    game.run.abilities++;
+    this.auraT = 1;
     switch (ab.id) {
       case 'block':
         this.blockT = up ? up.duration : ab.duration;
@@ -249,6 +265,7 @@ class Player {
             if (e.dead || hitOnce.has(e)) continue;
             if (Math.hypot(e.x - c.x, e.y - c.y) > ab.radius + e.r) continue;
             hitOnce.add(e);
+            game.run.banished++;
             e.stunT = e.boss ? ab.stun / 2 : ab.stun;
             game.hitEnemy(e, Math.round(this.rollDamage() * ab.dmgFactor), Math.atan2(e.y - c.y, e.x - c.x), 0);
           }
@@ -280,6 +297,7 @@ class Player {
     const u = this.ult;
     this.ultCharge = 0;
     this.ultT = u.duration;
+    game.run.ults++;
     this.ultTick = 0;
     game.shake = 4;
     if (u.id === 'storm') {
@@ -370,6 +388,7 @@ class Player {
       aoeFactor: c.aoeFactor || 0,
       knockback: c.knockback,
       freeze: ice && this.abUp ? this.abUp.freeze : 0,
+      gold: (c.attack === 'arrow' && Cosmetics.has('archer', 'goldArrows')) || (c.attack === 'orb' && Cosmetics.has('mage', 'goldOrbs')),
     };
 
     // Nahschuss: Ein Gegner, der den Helden berührt, wird immer getroffen, egal wohin gezielt wird
@@ -396,18 +415,21 @@ class Player {
   }
 
   // Gibt true zurück, wenn der Schaden wirklich angekommen ist (nicht geblockt)
-  takeDamage(amount, game, { tick = false } = {}) {
+  // src = wer den Schaden macht (für die Todesursache in der Statistik)
+  takeDamage(amount, game, { tick = false, src = null } = {}) {
     if (game.state !== 'play' || game.devGod) return false;
     if (this.invulnT > 0) return false;
     if (this.blockT > 0) {
       if (!tick) game.fx.text(this.x, this.y - 12, 'Block', '#7fd4ff');
       return false;
     }
-    let mul = 1 - this.bonus('armor');
+    let mul = (1 - this.bonus('armor')) * (1 - Meta.bonus('armor'));
     if (this.ultActive && this.ult.dmgTaken) mul *= this.ult.dmgTaken; // Wirbelsturm: 80 % weniger aus allen Quellen
     amount = Math.max(1, Math.round(amount * mul));
     this.hp -= amount;
     this.lastHit = game.time;
+    game.run.dmgTaken += Math.min(amount, amount + this.hp);
+    if (src) game.run.lastHitBy = src;
     if (tick) {
       game.fx.text(this.x, this.y - 12, `-${amount}`, '#9be05a');
     } else {
@@ -424,7 +446,7 @@ class Player {
 
   gainXp(amount, game) {
     if (this.level >= MAX_LEVEL) return;
-    this.xp += amount * (1 + this.bonus('xpGain'));
+    this.xp += amount * this.xpMul;
     while (this.level < MAX_LEVEL && this.xp >= xpForLevel(this.level)) {
       this.xp -= xpForLevel(this.level);
       this.level++;
@@ -449,7 +471,7 @@ class Player {
 
     if (this.dash) ctx.globalAlpha = 0.55; // halb durchsichtig = unverwundbar
     if (behind) this.drawWeapon(ctx, sx, sy, flip, game);
-    drawSprite(ctx, SPR[this.cls.sprite], sx, sy - bob, { flip, white: this.hurtT > 0 });
+    drawSprite(ctx, heroSprite(this.cls.id), sx, sy - bob, { flip, white: this.hurtT > 0 });
     if (!behind) this.drawWeapon(ctx, sx, sy, flip, game);
     if (this.cls.id === 'warrior') this.drawShield(ctx, sx, sy, flip, game);
     ctx.globalAlpha = 1;
@@ -473,7 +495,7 @@ class Player {
         ctx.beginPath();
         ctx.arc(sx, sy + 1, r - 6, ang + 1, ang + 3);
         ctx.stroke();
-        drawRotated(ctx, SPR.sword, sx, sy + 2, ang, 1);
+        drawRotated(ctx, swordSprite(), sx, sy + 2, ang, 1);
         return;
       }
       if (this.spin) {
@@ -493,10 +515,10 @@ class Player {
         ctx.arc(sx, sy + 1, c.range - 5, this.swing.a - c.arc / 2, ang);
         ctx.stroke();
       }
-      if (this.blockT <= 0) drawRotated(ctx, SPR.sword, sx, sy + 2, ang, 1);
+      if (this.blockT <= 0) drawRotated(ctx, swordSprite(), sx, sy + 2, ang, 1);
     } else if (c.attack === 'arrow') {
-      drawRotated(ctx, SPR.bow, sx, sy + 1, this.aim, 3);
-      if (this.cd <= 0) drawRotated(ctx, SPR.arrow, sx, sy + 1, this.aim, 1);
+      drawRotated(ctx, bowSprite(), sx, sy + 1, this.aim, 3);
+      if (this.cd <= 0) drawRotated(ctx, arrowSprite(), sx, sy + 1, this.aim, 1);
     } else {
       const bx = sx + (flip ? -7 : 7);
       const by = sy + 1 + Math.round(Math.sin(game.time * 3));
@@ -506,7 +528,7 @@ class Player {
         ctx.arc(bx, by, 7, 0, Math.PI * 2);
         ctx.fill();
       }
-      drawSprite(ctx, SPR.book, bx, by, { flip });
+      drawSprite(ctx, bookSprite(), bx, by, { flip });
     }
   }
 
@@ -518,9 +540,9 @@ class Player {
       ctx.beginPath();
       ctx.arc(sx, sy, pulse, 0, Math.PI * 2);
       ctx.stroke();
-      drawSprite(ctx, SPR.shield, sx + Math.cos(this.aim) * 8, sy + Math.sin(this.aim) * 8 + 1);
+      drawSprite(ctx, shieldSprite(), sx + Math.cos(this.aim) * 8, sy + Math.sin(this.aim) * 8 + 1);
     } else {
-      drawSprite(ctx, SPR.shield, sx + (flip ? 5 : -5), sy + 2, { flip });
+      drawSprite(ctx, shieldSprite(), sx + (flip ? 5 : -5), sy + 2, { flip });
     }
   }
 }

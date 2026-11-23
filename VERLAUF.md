@@ -66,8 +66,18 @@ Neue wichtige Entscheidungen bitte unten ergänzen.
   - **Säulen:** erscheinen im Sichtfeld, 1 s pro Animationsstufe.
   - **Upgrade-Wahl nach Ebene 1:** Fähigkeit ODER Ult. Spiegelschild (2 s, doppelter Rückwurfschaden, unverwundbar), Sturmwalze (Tornado zum Cursor, verlangsamt), Feuersturm (+20 % Tempo, Feuerspur mit Brand), Rankenpfad (8 s Bremsfeld für Gegner), Frostfächer (Fächer + nächste 3 Schüsse frieren 3 s ein), Windläufer (Geschosse treffen nicht, schneller schießen), Arkansprung (7,5 s CD, 8 Kugeln bei Start und Ziel), Doppelbann (zweiter Bann am Cursor), Meteor (8-facher Schaden in der Feuerzone, auch an Bossen).
 
+- **v0.7.0 (23.11.2026), dazu Spielhalle 0.3.0:**
+  - Hauptmenü: Upgrades, Erfolge, Statistik, Optionen und ein klickbarer Discord-Link. Der Launcher öffnet Links aus dem Spiel jetzt im Browser (`setWindowOpenHandler` in `Soulgrind/src/main.js`). Ältere Launcher öffnen den Link in einem eigenen Fenster.
+  - **Gold-Upgrades:** Schaden +3 %, Max. Leben +5 %, Rüstung 2 %, Lauftempo +2 %, Mehr XP +5 %, Goldfund +5 %, Abklingzeit -2 % pro Stufe. 5 Stufen, Preise 25/50/100/175/300.
+  - **Erfolge/Skins** wie vom Nutzer vorgegeben. Skins werden im Erfolge-Tab an- und abgelegt, beim Freischalten automatisch angelegt. Ebene-3-Erfolge (Krone + Titel) sind sichtbar, aber gesperrt.
+  - **Statistik** lokal, pro Klasse und gesamt. Selbst ergänzt: Siege, Ults benutzt, Ebenen geschafft, Herzen gesammelt. Dev-Runs zählen nicht.
+  - **Volghard:** stärker (1600 Leben, Tempo 15, Salven alle 1,9 s, bis 7 Pflanzen alle 5 s), düsteres Aussehen als toter Baum mit glühenden Augen.
+  - **Ebene 2 heißt jetzt Katakomben:** 7 Minuten, siehe Spielregeln in CLAUDE.md. El'Matho gibt 40 Gold.
+  - **Online-Rangliste:** Der Nutzer will sie, aber als eigenes späteres Update (Supabase-Account nötig, Schummeln wäre möglich, Spieler bräuchten einen öffentlichen Namen).
+
 ## Offene Punkte und Ideen
-- **Menü-Upgrades für Gold** und **Erfolge** sind als „Coming Soon“ im Hauptmenü, noch nicht gebaut.
+- **Ebene 3** mit Boss (laut Erfolgen ein Kraken) und die Ebene-3-Erfolge (Krone + Titel) fehlen noch.
+- **Online-Rangliste** als eigenes Update.
 - **Boss für Ebene 2** fehlt noch (der Nutzer liefert die Idee).
 - **Erholung** (+0,1 Leben/s pro Rang, wie vom Nutzer vorgegeben) ist sehr schwach, weil es zusätzlich eine Grund-Regeneration gibt (2 % Leben/s nach 4 s ohne Treffer). Noch nicht entschieden, ob die Grund-Regeneration wegfällt oder Erholung stärker wird.
 - Als Nächstes vorgeschlagen: ein paar Runden spielen und Balance notieren, dann **Prestige-Punkte**, danach **Loot**.

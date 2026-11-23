@@ -53,6 +53,10 @@ const Records = {
     this.gold += n;
     try { localStorage.setItem(this.GOLD_KEY, String(this.gold)); } catch (e) { /* egal */ }
   },
+  spendGold(n) {
+    this.gold = Math.max(0, this.gold - n);
+    try { localStorage.setItem(this.GOLD_KEY, String(this.gold)); } catch (e) { /* egal */ }
+  },
 };
 Records.load();
 Records.loadGold();
