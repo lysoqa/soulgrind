@@ -29,7 +29,8 @@ Der Launcher startet das Spiel bei `npm start` direkt aus `../Soulgrind-Game`. I
 | `js/stats.js` | Stats für die Level-Up-Auswahl |
 | `js/player.js` | Held: Bewegung, Angriffe, Fähigkeiten, XP-Kurve |
 | `js/enemies.js` | Gegnertypen, Mini-Bosse, Spawns |
-| `js/stages.js` | Ebenen, Boss Volghard, Pflanzen, Trolle, Steinsäulen, Steinboden (alle Ebenen-Werte) |
+| `js/stages.js` | Ebenen-Liste, Volghard, El'Matho, Pflanzen, Trolle, Ratten, Wichte, Steinsäulen, Böden |
+| `js/palace.js` | Ebene 3 Palast: Wachen, Goblins, Kisten/Fallen, Rüstungen, feste Säulen, Karthul mit Heilerin und Schurke (alle Werte) |
 | `js/settings.js` | Optionen (Taste für Auto-Schuss, Lautstärke Musik/Effekte, Ton aus), localStorage |
 | `js/audio.js` | Soundeffekte (`SFX`), Musik (`MUSIC`) und kurze Melodien (`JINGLES`), alles im Code erzeugt (Web Audio API). `Sound.play('name')` für Effekte |
 | `js/loot.js` | Gold, Herzen, Fledermaus-Schwarm, Boden-Effekte der Upgrades (Feuerspur, Rankenpfad, Meteor) |
@@ -59,12 +60,12 @@ Der Launcher startet das Spiel bei `npm start` direkt aus `../Soulgrind-Game`. I
 - **Developer-Modus:** F1 im Spiel, nur wenn das Spiel aus dem Ordner `Soulgrind-Game` läuft (nicht in installierten Versionen).
 - **Gegner:** Zombie, Fledermaus, Skelett-Schütze, Echse (selten, bleibt stehen, Warnlinie, ausweichbarer Strahl).
 - **Rundentimer:** je länger, desto mehr Gegner. Alle 3 Minuten ein Mini-Boss **ohne Ankündigung**, nur größer und stärker.
-- **Ebenen:** Ebene 1 (Wald) 5 Min., dann Timer-Stopp, Rest besiegen, Boss Volghard (toter, düsterer Baum, Dornen, Pflanzen). Danach „Ebene geschafft“ mit Upgrade-Wahl, gleicher Held in Ebene 2 **Katakomben** (7 Min.): Trolle statt Zombies, Skelett-Plätze halb Ratten (Giftspucke 2/s für 5 s), halb Wichte (springen zu), etwas weniger Fledermäuse, animierte Steinsäulen im Bild. Boss **El'Matho, König der Trolle** (Bodenstampfer mit Warnkreis, Felswurf mit Schatten, ruft Trolle, Wut ab 50 %). Danach Sieg und zurück ins Menü. Ebene 3 kommt später.
+- **Ebenen:** Ebene 1 (Wald) 5 Min., dann Timer-Stopp, Rest besiegen, Boss Volghard (toter, düsterer Baum, Dornen, Pflanzen). Danach „Ebene geschafft“ mit Upgrade-Wahl, gleicher Held in Ebene 2 **Katakomben** (7 Min.): Trolle statt Zombies, Skelett-Plätze halb Ratten (Giftspucke 2/s für 5 s), halb Wichte (springen zu), etwas weniger Fledermäuse, animierte Steinsäulen im Bild. Boss **El'Matho, König der Trolle** (Bodenstampfer mit Warnkreis, Felswurf mit Schatten, ruft Trolle, Wut ab 50 %), im Bosskampf mehr Säulen. Danach Upgrade-Wahl (falls noch eine offen ist) und Ebene 3 **Palast der Seelen** (7 Min.): roter Teppich, feste Marmorsäulen (blocken), Wachen statt Zombies (gleiches Leben, etwas schneller, viel stärker), Goblin-Schützen statt Skeletten (manchmal 3er-Salve), seltene Kisten (15 Gold, 30 % sind Fallen und greifen an), erwachende Rüstungen. Boss **Karthul, der Abendschleier** mit Auftritts-Animation, Schattenklingen, schwenkendem Seelenstrahl, Wut ab 50 %; Diener **Heilerin** (heilt alle 7 s Boss und Schurke um 1/6) und **Schurke** (nach 2 s unsichtbar, Fußspuren, aufgeladener Sprint). Danach Sieg. Ebene 4 **Friedhof** mit Boss **Yaahil, der Grabwächter** ist für 0.10.0 geplant (Ideen in VERLAUF.md).
 - **Gold-Upgrades (Menü):** 7 Upgrades, je 5 Stufen, Preise 25/50/100/175/300.
-- **Erfolge:** pro Klasse 4 (Spezial-Zähler 250, 5000 Kills, 10000 Kills, Boss Ebene 3 noch gesperrt). Belohnungen = Skins, im Erfolge-Tab an-/ablegbar.
+- **Erfolge:** pro Klasse 4 (Spezial-Zähler 250, 5000 Kills, 10000 Kills, Karthul besiegen). Belohnungen = Skins, im Erfolge-Tab an-/ablegbar. Karthul gibt Krone (auf dem Kopf) und Titel (Name des Erfolgs, auf der Klassenkarte).
 - **Statistik:** Reiter Insgesamt + jede Klasse. Lokal gespeichert. Online-Rangliste ist für ein eigenes späteres Update geplant (braucht einen Online-Speicher, z. B. Supabase, den der Nutzer anlegt).
 - **Discord-Link** im Hauptmenü: https://discord.gg/ad2RtwyGyv (der Launcher öffnet Links ab Spielhalle 0.3.0 im Browser).
-- **Sound:** Effekte und Chiptune-Musik werden im Code erzeugt, keine Sounddateien. Musik: Menü, Wald, Katakomben, Bosskampf. Melodien für Ebene geschafft, Sieg, Tod. Musik in Pause und Stat-Wahl leiser. `tools/sound-preview.html` zum Anhören (im normalen Browser öffnen).
+- **Sound:** Effekte und Chiptune-Musik werden im Code erzeugt, keine Sounddateien. Musik: Menü, Wald, Katakomben, Palast, und eigene Boss-Musik pro Ebene (`bossMusic` in `STAGES`). Melodien für Ebene geschafft, Sieg, Tod. Musik in Pause und Stat-Wahl leiser. `tools/sound-preview.html` zum Anhören (im normalen Browser öffnen).
 - **Auto-Schuss:** Q schaltet an/aus (alle Klassen, Ziel = Maus). Taste im Optionen-Menü änderbar.
 - **Hauptmenü:** Spielen / Upgrades / Erfolge / Statistik / Optionen, darunter der Discord-Link.
 - **Gold:** 20 % Chance auf 1 Gold pro Gegner, Mini-Boss 10, Volghard 25. Hinlaufen zum Einsammeln (Magnet). Gold einer Ebene ist erst sicher, wenn die Ebene geschafft ist. Stirbt man vorher, ist das Gold dieser Ebene weg. Gesamt-Gold für alle Klassen, im Hauptmenü sichtbar.

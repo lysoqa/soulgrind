@@ -135,6 +135,7 @@ class Enemy {
       // betäubt: keine Bewegung, kein Angriff, Strahl wird abgebrochen
       this.stunT -= dt;
       this.beamState = null;
+      if (t.palaceAI) cancelPalaceAttack(this); // Betäubung unterbricht Strahl, Heilung und Sprint
       mx = 0; my = 0;
     } else if (t.beam) {
       const b = t.beam;
@@ -162,6 +163,9 @@ class Enemy {
           this.beamAngle = Math.atan2(dy, dx); // Richtung wird festgelegt, danach kann man ausweichen
         }
       }
+    } else if (t.palaceAI) {
+      const m = updatePalaceEnemy(this, dt, game, ux, uy, d);
+      mx = m.x; my = m.y;
     } else if (t.tree) {
       const m = updateVolghard(this, dt, game, ux, uy);
       mx = m.x; my = m.y;
@@ -187,6 +191,12 @@ class Enemy {
         mx = 0; my = 0;
       }
     } else if (t.ranged) {
+      // Salve: weitere Schüsse kurz hintereinander (Goblins)
+      if (this.burstLeft > 0 && (this.burstT -= dt) <= 0) {
+        this.burstLeft--;
+        this.burstT = t.ranged.burst.gap;
+        this.shoot(game, Math.atan2(dy, dx));
+      }
       if (d > t.ranged.dist + 15) { mx = ux; my = uy; }
       else if (d < t.ranged.dist - 15) { const k = t.ranged.retreat || 1; mx = -ux * k; my = -uy * k; }
       else { mx = -uy * this.strafe * 0.7; my = ux * this.strafe * 0.7; }
@@ -195,6 +205,8 @@ class Enemy {
       if (this.fireT <= 0 && d < (t.ranged.range || 180)) {
         this.shoot(game, Math.atan2(dy, dx));
         this.fireT = t.ranged.cd * (0.8 + Math.random() * 0.4) * (this.boss ? 0.7 : 1);
+        const bu = t.ranged.burst;
+        if (bu && Math.random() < bu.chance) { this.burstLeft = bu.n - 1; this.burstT = bu.gap; }
       }
     } else if (t.zigzag) {
       const wave = Math.sin(game.time * 7 + this.seed) * 0.9;
@@ -246,12 +258,13 @@ class Enemy {
       game.projectiles.push({
         friendly: false, kind: r.kind || 'bullet', x: this.x, y: this.y,
         vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, life: (r.range || 200) / sp, r: this.boss ? 3 : 2, src: this.srcName,
-        dmg: r.fixedDmg || this.bulletDmg, poison: r.poison || null,
+        dmg: r.fixedDmg || this.bulletDmg, poison: r.poison || null, sprite: r.sprite || null,
       });
     }
   }
 
   draw(ctx, cam, game) {
+    if (this.type.palaceAI && drawPalaceExtras(this, ctx, cam, game)) return; // Karthul & Diener: Warnungen, Unsichtbarkeit
     const sx = Math.round(this.x - cam.x);
     const sy = Math.round(this.y - cam.y);
     const sprites = this.type.sprites;

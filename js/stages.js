@@ -5,12 +5,19 @@
 // duration = Sekunden bis zum Boss (null = endlos), levelBonus = Gegner so viele Level stärker,
 // replace = Gegnertyp austauschen (Liste = zufällig einer davon), weightMul = Häufigkeit ändern,
 // pillars = Steinsäulen erscheinen. Nach dem Boss der letzten Ebene hat man gewonnen.
+// music = Musik der Ebene, bossMusic = Musik im Bosskampf.
 const STAGES = [
-  { name: 'Wald', music: 'forest', ground: 'grass', duration: 300, boss: 'volghard', levelBonus: 0, replace: {}, pillars: false },
+  { name: 'Wald', music: 'forest', bossMusic: 'boss', ground: 'grass', duration: 300, boss: 'volghard', levelBonus: 0, replace: {}, pillars: false },
   {
-    name: 'Katakomben', music: 'catacombs', ground: 'crypt', duration: 420, boss: 'elmatho', levelBonus: 2, pillars: true,
+    name: 'Katakomben', music: 'catacombs', bossMusic: 'bossTroll', ground: 'crypt', duration: 420, boss: 'elmatho', levelBonus: 2, pillars: true,
     replace: { zombie: 'troll', skeleton: ['rat', 'wight'] }, // Skelett-Plätze: halb Ratten, halb Wichte
     weightMul: { bat: 0.8 }, // etwas weniger Fledermäuse
+  },
+  {
+    // Werte für Kisten, Rüstungen, Säulen und Karthul stehen in palace.js
+    name: 'Palast der Seelen', music: 'palace', bossMusic: 'bossKarthul', ground: 'palace', duration: 420, boss: 'karthul', levelBonus: 4,
+    pillars: false, palace: true,
+    replace: { zombie: 'guard', skeleton: 'goblin' }, // Wache statt Zombie, Goblin statt Skelett
   },
 ];
 
@@ -31,9 +38,9 @@ const VOLGHARD = {
 // El'Matho, König der Trolle (Boss am Ende von Ebene 2). Schaden wächst mit dem Gegnerlevel.
 const ELMATHO = {
   spawnDist: 150,
-  slamCd: 6, slamWindup: 1.0, slamRadius: 55, slamDmg: 26, // Bodenstampfer mit Warnkreis
-  rockCd: 3.5, rockFlight: 1.1, rockRadius: 14, rockDmg: 18, // Felswurf, Schatten zeigt den Einschlag
-  summonCd: 14, summonCount: [2, 3], maxTrolls: 6, // ruft Trolle zur Hilfe
+  slamCd: 4.5, slamWindup: 0.85, slamRadius: 55, slamDmg: 26, // Bodenstampfer mit Warnkreis (0.9.0: schneller)
+  rockCd: 2.6, rockFlight: 0.95, rockRadius: 14, rockDmg: 18, // Felswurf, Schatten zeigt den Einschlag
+  summonCd: 12, summonCount: [2, 3], maxTrolls: 6, // ruft Trolle zur Hilfe
   rageAt: 0.5, rageSpeed: 1.5, rageCd: 0.65, // ab 50 % Leben: 50 % schneller, Angriffe öfter
 };
 
@@ -53,6 +60,8 @@ const PILLAR = {
   radius: 4, // Körpergröße (blockt Held und Gegner)
   slowRadius: 24, // Umkreis, in dem der Held verlangsamt wird
   slow: 0.55, // Lauftempo im Umkreis (0.55 = 45 % langsamer)
+  bossInterval: [1.8, 3], // im Bosskampf kommen Säulen viel öfter
+  bossMax: 12,
 };
 
 // ---------- Neue Gegnertypen ----------
@@ -88,10 +97,12 @@ ENEMY_TYPES.volghard = {
 
 // ---------- Sprites ----------
 
+// Trolle: dunkle, fahle Haut und rot glühende Augen
+const TROLL_COLORS = { t: '#5e6b56', T: '#3a4535', w: '#cfc79a', x: '#ff3a2a', L: '#3e2614', l: '#6a4220' };
 SPR.trollA = makeSprite([
   '....kkkkk....',
   '...ktttttk...',
-  '..kttTtwtwk..',
+  '..kttTtxtxk..',
   '..ktttttttk..',
   '..ktwkkkwtk..',
   '.kkktttttkkk.',
@@ -102,12 +113,12 @@ SPR.trollA = makeSprite([
   '....ktk.ktk..',
   '...kttk.kttk.',
   '...kkkk.kkkk.',
-], { t: '#8a9a7a', T: '#5f6e52', L: '#5e3b1c', l: '#8a5a2b' });
+], TROLL_COLORS);
 SPR.trollB = makeSprite([
   '.............',
   '....kkkkk....',
   '...ktttttk...',
-  '..kttTtwtwk..',
+  '..kttTtxtxk..',
   '..ktttttttk..',
   '..ktwkkkwtk..',
   '.kkktttttkkk.',
@@ -117,7 +128,7 @@ SPR.trollB = makeSprite([
   'kk..kLLlLk...',
   '...kttk.kttk.',
   '...kkkk.kkkk.',
-], { t: '#8a9a7a', T: '#5f6e52', L: '#5e3b1c', l: '#8a5a2b' });
+], TROLL_COLORS);
 
 const PLANT_COLORS = { f: '#c94a6a', F: '#8a2a4a', g: '#5fae3e', G: '#3b7326' };
 SPR.plantA = makeSprite([
@@ -231,7 +242,7 @@ SPR.wightB = makeSprite([
 ], WIGHT_COLORS);
 
 // El'Matho, König der Trolle: großer Troll mit Krone, Königsschurz und Keule
-const ELMATHO_COLORS = { t: '#8a9a7a', T: '#5f6e52', y: '#ffd34a', r: '#d93a4a', x: '#ff4d4d', w: '#f5f5d0', P: '#6b2a8c', L: '#5e3b1c', l: '#8a5a2b' };
+const ELMATHO_COLORS = { t: '#5e6b56', T: '#3a4535', y: '#ffd34a', r: '#d93a4a', x: '#ff4d4d', w: '#f5f5d0', P: '#4a1a5c', L: '#3e2614', l: '#8a5a2b' };
 const ELMATHO_ROWS = [
   '......y.y.y.y.........',
   '......yyyyyyy.........',
@@ -390,7 +401,7 @@ function drawCryptGround(ctx, cam) {
 
 function spawnStageBoss(game) {
   const id = game.stageDef.boss;
-  const cfg = id === 'elmatho' ? ELMATHO : VOLGHARD;
+  const cfg = { volghard: VOLGHARD, elmatho: ELMATHO, karthul: KARTHUL }[id];
   const p = game.player;
   let pos = null;
   for (let tries = 0; tries < 16 && !pos; tries++) {
@@ -409,7 +420,7 @@ function spawnStageBoss(game) {
     e.plantT = 3;
     e.windupT = 0;
     e.volley = 0;
-  } else {
+  } else if (id === 'elmatho') {
     e.slamT = 3;
     e.slamWind = 0;
     e.rockT = 2;
@@ -419,9 +430,10 @@ function spawnStageBoss(game) {
   e.fightTime = 0;
   game.enemies.push(e);
   game.stageBoss = e;
+  if (id === 'karthul') { initKarthul(e, game); return; } // eigener Auftritt mit Animation
   game.shake = 8;
   Sound.play('bossRoar');
-  const col = id === 'elmatho' ? '#8a9a7a' : '#465428';
+  const col = id === 'elmatho' ? '#5e6b56' : '#465428';
   game.fx.ring(e.x, e.y, col, 40);
   game.fx.burst(e.x, e.y, col, 40);
 }
@@ -591,7 +603,8 @@ function drawHazards(ctx, cam, game) {
 
 // ---------- Steinsäulen ----------
 
-const pillarActive = (pl) => pl.age >= PILLAR.rise * 2 && pl.age < PILLAR.life;
+// fixed = feste Säule (Palast), steht immer
+const pillarActive = (pl) => pl.fixed || (pl.age >= PILLAR.rise * 2 && pl.age < PILLAR.life);
 
 // Sichtbare Höhe in Pixeln: Spitze, fast oben, oben (und beim Versinken rückwärts)
 function pillarRows(pl) {
@@ -605,14 +618,15 @@ function pillarRows(pl) {
 
 function updatePillars(dt, game) {
   for (const pl of game.pillars) pl.age += dt;
-  game.pillars = game.pillars.filter((pl) => pl.age < PILLAR.life + PILLAR.rise * 2);
+  game.pillars = game.pillars.filter((pl) => pl.fixed || pl.age < PILLAR.life + PILLAR.rise * 2);
   if (!game.stageDef.pillars || game.state !== 'play') return;
 
   game.pillarT -= dt;
   if (game.pillarT > 0) return;
-  const [a, b] = PILLAR.interval;
+  const boss = game.phase === 'boss'; // im Bosskampf mehr Säulen
+  const [a, b] = boss ? PILLAR.bossInterval : PILLAR.interval;
   game.pillarT = a + Math.random() * (b - a);
-  if (game.pillars.length >= PILLAR.max) return;
+  if (game.pillars.length >= (boss ? PILLAR.bossMax : PILLAR.max)) return;
 
   const p = game.player;
   const m = PILLAR.viewMargin;
@@ -637,7 +651,7 @@ function blockByPillars(obj, game, slide = 0) {
     let dx = obj.x - pl.x;
     let dy = obj.y - pl.y;
     let d = Math.hypot(dx, dy);
-    const min = obj.r + PILLAR.radius;
+    const min = obj.r + (pl.radius || PILLAR.radius);
     if (d >= min) continue;
     if (d < 0.01) { dx = 1; dy = 0; d = 1; }
     const nx = dx / d;
@@ -658,7 +672,7 @@ function blockByPillars(obj, game, slide = 0) {
 // Faktor fürs Lauftempo des Helden (1 = normal)
 function pillarSlow(game, x, y) {
   for (const pl of game.pillars) {
-    if (pillarActive(pl) && Math.hypot(x - pl.x, y - pl.y) < PILLAR.slowRadius) return PILLAR.slow;
+    if (!pl.fixed && pillarActive(pl) && Math.hypot(x - pl.x, y - pl.y) < PILLAR.slowRadius) return PILLAR.slow;
   }
   return 1;
 }
@@ -666,7 +680,7 @@ function pillarSlow(game, x, y) {
 // Staubkreis am Boden, zeigt den Bremsbereich
 function drawPillarZones(ctx, cam, game) {
   for (const pl of game.pillars) {
-    if (!pillarActive(pl)) continue;
+    if (pl.fixed || !pillarActive(pl)) continue;
     const sx = Math.round(pl.x - cam.x);
     const sy = Math.round(pl.y - cam.y);
     ctx.fillStyle = 'rgba(30,28,34,0.18)';

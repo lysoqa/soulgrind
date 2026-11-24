@@ -58,10 +58,18 @@ function drawHUD(ctx, game) {
   if (game.phase === 'boss' && boss && !boss.dead) {
     const bw = 180;
     const bx = Math.round((W - bw) / 2);
-    const king = boss.type.king;
-    Font.draw(ctx, boss.type.name, W / 2, 18, { align: 'center', scale: 2, color: king ? '#c8d8b0' : '#9be05a', shadow: '#1a3010' });
+    // Farben je Boss: Name, Schatten, Leiste
+    const look = boss.type.king ? ['#c8d8b0', '#1a3010', '#6a7a5a'] : boss.type.palaceAI ? ['#c89aff', '#2a1050', '#8a5ac8'] : ['#9be05a', '#1a3010', '#6a7a3a'];
+    Font.draw(ctx, boss.type.name, W / 2, 18, { align: 'center', scale: 2, color: look[0], shadow: look[1] });
     if (boss.type.title) Font.draw(ctx, boss.type.title, W / 2, 30, { align: 'center', color: '#8b8a95', shadow: null });
-    drawBar(ctx, bx, 37, bw, 5, boss.hp / boss.maxHp, boss.enraged ? '#e04848' : king ? '#8a9a7a' : '#6a7a3a');
+    drawBar(ctx, bx, 37, bw, 5, boss.hp / boss.maxHp, boss.enraged ? '#e04848' : look[2]);
+    // Diener (Heilerin, Schurke) mit kleinen Leisten darunter
+    game.minions.filter((m) => !m.dead).forEach((m, i, list) => {
+      const mw = 70;
+      const mx = Math.round(W / 2 - (list.length * (mw + 10) - 10) / 2 + i * (mw + 10));
+      Font.draw(ctx, m.type.name, mx, 45, { color: '#b9b4a6', shadow: null });
+      drawBar(ctx, mx, 52, mw, 3, m.hp / m.maxHp, m.type.palaceAI === 'healer' ? '#7fe07f' : '#a05a5a');
+    });
   }
 
   if (game.autoFire) Font.draw(ctx, `Auto (${Settings.keyLabel(Settings.autoFireKey)})`, x - 5, H - 27, { align: 'right', color: '#7fe07f' });
@@ -232,7 +240,10 @@ function drawSelect(ctx, game) {
     Font.draw(ctx, cls.name, r.x + r.w / 2, y + 7, { align: 'center', scale: 2 });
     const bob = hover && Math.floor(game.time * 4) % 2 ? 1 : 0;
     drawSprite(ctx, heroSprite(cls.id), r.x + r.w / 2, y + 40 - bob, { scale: 3 });
-    Font.draw(ctx, cls.gear, r.x + r.w / 2, y + 62, { align: 'center', color: '#ffd34a' });
+    if (hasCrown(cls.id)) drawSprite(ctx, SPR.crown, r.x + r.w / 2 - 3, y + 19 - bob, { scale: 3 });
+    // Titel aus dem Ebene-3-Erfolg ersetzt die Ausrüstungs-Zeile
+    const title = heroTitle(cls.id);
+    Font.draw(ctx, title || cls.gear, r.x + r.w / 2, y + 62, { align: 'center', color: title ? '#fff4c2' : '#ffd34a' });
 
     Object.entries(cls.pips).forEach(([label, val], j) => {
       const py = y + 71 + j * 8;
@@ -252,7 +263,7 @@ function drawSelect(ctx, game) {
       const n = k + 1;
       const best = rec.best[n];
       const color = rec.cleared[n] ? '#9be05a' : best !== undefined ? '#f1ede2' : '#5d5868';
-      Font.draw(ctx, `E${n} ${best !== undefined ? fmtTime(best) : '-'}`, r.x + 8 + k * 50, y + 111, { color, shadow: null });
+      Font.draw(ctx, `E${n} ${best !== undefined ? fmtTime(best) : '-'}`, r.x + 6 + k * 35, y + 111, { color, shadow: null });
     });
     Font.draw(ctx, `Kills ${rec.kills}`, r.x + 8, y + 120, { color: '#b9b4a6', shadow: null });
   });

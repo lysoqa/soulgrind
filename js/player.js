@@ -479,6 +479,7 @@ class Player {
     if (this.dash) ctx.globalAlpha = 0.55; // halb durchsichtig = unverwundbar
     if (behind) this.drawWeapon(ctx, sx, sy, flip, game);
     drawSprite(ctx, heroSprite(this.cls.id), sx, sy - bob, { flip, white: this.hurtT > 0 });
+    if (hasCrown(this.cls.id)) drawSprite(ctx, SPR.crown, sx + (flip ? 1 : -1), sy - bob - 7);
     if (!behind) this.drawWeapon(ctx, sx, sy, flip, game);
     if (this.cls.id === 'warrior') this.drawShield(ctx, sx, sy, flip, game);
     ctx.globalAlpha = 1;

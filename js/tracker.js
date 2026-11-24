@@ -9,7 +9,7 @@ const Tracker = {
     return {
       runs: 0, deaths: 0, aborts: 0, wins: 0, playTime: 0, goldEarned: 0, goldSpent: 0, stagesCleared: 0,
       kills: 0, abilities: 0, ults: 0, bosses: 0, dmgDealt: 0, dmgTaken: 0, maxHit: 0, hearts: 0,
-      reflects: 0, pierce2: 0, banished: 0, rerolls: 0,
+      reflects: 0, pierce2: 0, banished: 0, rerolls: 0, karthul: 0,
       killsByType: {}, deathsBy: {}, statPicks: {}, abilityPicks: {},
       best: { time: 0, level: 0, kills: 0, gold: 0, bosses: 0, fastestBoss: 0 },
       bestBuild: null, // Stats aus dem längsten Run: { time, stats, cls }
@@ -36,7 +36,7 @@ const Tracker = {
   newRun() {
     return {
       playTime: 0, kills: 0, abilities: 0, ults: 0, bosses: 0, dmgDealt: 0, dmgTaken: 0, maxHit: 0, hearts: 0,
-      reflects: 0, pierce2: 0, banished: 0, rerolls: 0, stagesCleared: 0,
+      reflects: 0, pierce2: 0, banished: 0, rerolls: 0, stagesCleared: 0, karthul: 0,
       killsByType: {}, statPicks: {}, fastestBoss: 0, lastHitBy: null,
     };
   },
@@ -53,7 +53,7 @@ const Tracker = {
       if (result === 'death') d.deaths++;
       if (result === 'abort') d.aborts++;
       if (result === 'win') d.wins++;
-      for (const k of ['playTime', 'kills', 'abilities', 'ults', 'bosses', 'dmgDealt', 'dmgTaken', 'hearts', 'reflects', 'pierce2', 'banished', 'rerolls', 'stagesCleared']) d[k] += r[k];
+      for (const k of ['playTime', 'kills', 'abilities', 'ults', 'bosses', 'dmgDealt', 'dmgTaken', 'hearts', 'reflects', 'pierce2', 'banished', 'rerolls', 'stagesCleared', 'karthul']) d[k] += r[k];
       d.goldEarned += game.bankedGold;
       d.maxHit = Math.max(d.maxHit, r.maxHit);
       addMap(d.killsByType, r.killsByType);

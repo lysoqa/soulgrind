@@ -331,11 +331,11 @@ function drawVictory(ctx, game) {
   ctx.fillStyle = 'rgba(20,14,4,0.85)';
   ctx.fillRect(0, 0, W, H);
   Font.draw(ctx, 'Sieg!', W / 2, 16, { align: 'center', scale: 5, color: '#ffd34a', shadow: '#3a2a08' });
-  if (s.boss) Font.draw(ctx, `${s.boss} ist besiegt. Die Katakomben sind befreit.`, W / 2, 50, { align: 'center', color: '#f1ede2' });
+  if (s.boss) Font.draw(ctx, `${s.boss} ist besiegt. Der ${STAGES[s.stage - 1].name} ist befreit.`, W / 2, 50, { align: 'center', color: '#f1ede2' });
   Font.draw(ctx, `${p.cls.name} · Level ${p.level} · Kills ${p.kills} · ${fmtLong(game.run.playTime)}`, W / 2, 62, { align: 'center', color: '#b9b4a6' });
   drawSprite(ctx, SPR.coin, W / 2 - 50, 77);
   Font.draw(ctx, `${game.bankedGold} Gold aus diesem Run gesichert`, W / 2 - 44, 75, { align: 'left', color: '#ffd34a' });
-  Font.draw(ctx, 'Ebene 3 kommt bald ...', W / 2, 96, { align: 'center', scale: 2, color: '#8b3dff', shadow: '#2a1050' });
+  Font.draw(ctx, `Ebene ${STAGES.length + 1} kommt bald ...`, W / 2, 96, { align: 'center', scale: 2, color: '#8b3dff', shadow: '#2a1050' });
   Font.draw(ctx, 'Dein Held hat seine Reise beendet.', W / 2, 118, { align: 'center', color: '#8b8a95' });
   drawNewAchievements(ctx, game, 134);
   if (game.deadT > 1.5 && Math.floor(game.time * 2) % 2 === 0) {

@@ -213,6 +213,14 @@ const SFX = {
   slam: { label: 'Bodenstampfer: Einschlag', fn: (s) => { s.noise({ dur: 0.6, vol: 0.5, f: 500, f2: 60 }); s.tone({ wave: 'sine', f: 80, f2: 28, dur: 0.6, vol: 0.45 }); } },
   rock: { label: 'Felsbrocken', gap: 0.1, fn: (s) => { s.noise({ dur: 0.3, vol: 0.3, f: 700, f2: 100 }); s.tone({ wave: 'sine', f: 110, f2: 50, dur: 0.25, vol: 0.25 }); } },
   pillar: { label: 'Säule wächst', gap: 0.3, fn: (s) => s.noise({ dur: 0.5, vol: 0.15, f: 300, f2: 900 }) },
+  chest: { label: 'Kiste öffnen', fn: (s) => { s.noise({ dur: 0.12, vol: 0.2, f: 900 }); ['E6', 'G6', 'B6', 'E7'].forEach((n, i) => s.tone({ wave: 'square', f: noteFreq(n), dur: 0.1, vol: 0.07, at: 0.1 + i * 0.05 })); } },
+  mimic: { label: 'Kisten-Falle', fn: (s) => { s.tone({ wave: 'sawtooth', f: 180, f2: 60, dur: 0.4, vol: 0.2, vib: 20 }); s.noise({ dur: 0.2, vol: 0.2, f: 1500 }); } },
+  awaken: { label: 'Rüstung erwacht', gap: 0.2, fn: (s) => { [0, 0.12, 0.24].forEach((at) => s.tone({ wave: 'square', f: 900, f2: 700, dur: 0.06, vol: 0.08, at })); s.tone({ wave: 'sine', f: 90, f2: 60, dur: 0.4, vol: 0.2, at: 0.3 }); } },
+  veil: { label: 'Karthul erscheint', fn: (s) => { s.tone({ wave: 'sine', f: 60, f2: 200, dur: 2.2, vol: 0.25, vib: 8 }); s.noise({ dur: 2.2, vol: 0.12, filter: 'bandpass', f: 300, f2: 2500, q: 4 }); } },
+  blade: { label: 'Schattenklingen', gap: 0.1, fn: (s) => { s.noise({ dur: 0.2, vol: 0.2, filter: 'bandpass', f: 2500, f2: 600, q: 3 }); s.tone({ wave: 'sine', f: 700, f2: 350, dur: 0.2, vol: 0.08 }); } },
+  soulBeam: { label: 'Seelenstrahl', fn: (s) => { s.tone({ wave: 'sawtooth', f: 110, dur: 1.6, vol: 0.1, vib: 12 }); s.tone({ wave: 'sine', f: 880, dur: 1.6, vol: 0.06, vib: 30 }); } },
+  shadowDash: { label: 'Schattensprung', gap: 0.2, fn: (s) => s.noise({ dur: 0.25, vol: 0.25, filter: 'bandpass', f: 400, f2: 3000, q: 2 }) },
+  heal: { label: 'Heilerin heilt', fn: (s) => ['A5', 'C#6', 'E6', 'A6'].forEach((n, i) => s.tone({ wave: 'sine', f: noteFreq(n), dur: 0.25, vol: 0.12, at: i * 0.07 })) },
   click: { label: 'Menü-Klick', gap: 0.03, fn: (s) => s.tone({ wave: 'square', f: 660, dur: 0.04, vol: 0.08 }) },
   buy: { label: 'Upgrade gekauft', fn: (s) => { s.play('gold'); ['G5', 'C6'].forEach((n, i) => s.tone({ wave: 'triangle', f: noteFreq(n), dur: 0.15, vol: 0.2, at: 0.08 + i * 0.08 })); } },
   achievement: { label: 'Erfolg', fn: (s) => [['C5', 0], ['G5', 0.1], ['C6', 0.2], ['E6', 0.3], ['G6', 0.4]].forEach(([n, at]) => s.tone({ wave: 'square', f: noteFreq(n), dur: 0.25, vol: 0.1, at })) },
@@ -223,6 +231,7 @@ const DRUMS = {
   k: (s, at, v, out) => s.tone({ wave: 'sine', f: 140, f2: 40, dur: 0.18, vol: 0.5 * v, at, out }), // Bassdrum
   s: (s, at, v, out) => s.noise({ dur: 0.12, vol: 0.22 * v, filter: 'bandpass', f: 1800, q: 0.8, at, out }), // Snare
   h: (s, at, v, out) => s.noise({ dur: 0.03, vol: 0.08 * v, filter: 'highpass', f: 7000, at, out }), // Hi-Hat
+  t: (s, at, v, out) => s.tone({ wave: 'sine', f: 200, f2: 70, dur: 0.16, vol: 0.4 * v, at, out }), // Tom (Trommel)
   d: (s, at, v, out) => s.tone({ wave: 'sine', f: 1800, f2: 900, dur: 0.08, vol: 0.06 * v, at, out }), // Tropfen (Katakomben)
 };
 
@@ -261,19 +270,70 @@ const MUSIC = {
     ],
   },
   catacombs: {
-    label: 'Ebene 2: Katakomben', bpm: 88,
+    // 0.9.0: düsterer, wie eine Orgel in einer Gruft, mit Wassertropfen
+    label: 'Ebene 2: Katakomben', bpm: 80,
     parts: [
-      { wave: 'triangle', vol: 0.14, vib: 5, notes: bars(
-        ['D5', '.', '.', '.', 'F5', '.', 'E5', '.'], ['D5', '.', '.', '.', 'A4', '.', '.', '.'],
-        ['Bb4', '.', '.', '.', 'D5', '.', 'C5', '.'], ['A4', '.', '.', '.', '-', '-', '-', '-'],
-        ['D5', '.', 'E5', '.', 'F5', '.', 'G5', '.'], ['A5', '.', '.', '.', 'G5', '.', 'F5', '.'],
-        ['E5', '.', 'C#5', '.', 'E5', '.', 'G5', '.'], ['F5', '.', 'E5', '.', 'D5', '.', '.', '.']) },
-      { wave: 'triangle', vol: 0.24, notes: bars(
-        ['D2', '.', '.', '.', 'D2', '.', 'A2', '.'], ['D2', '.', '.', '.', 'D2', '.', 'F2', '.'],
-        ['Bb1', '.', '.', '.', 'Bb1', '.', 'F2', '.'], ['A1', '.', '.', '.', 'A1', '.', 'E2', '.'],
-        ['D2', '.', '.', '.', 'D2', '.', 'A2', '.'], ['F2', '.', '.', '.', 'F2', '.', 'C3', '.'],
-        ['A1', '.', '.', '.', 'A1', '.', 'E2', '.'], ['D2', '.', '.', '.', 'A1', '.', '.', '.']) },
-      { drum: true, vol: 0.7, notes: bars(...Array(4).fill([['k', '-', '-', 'h', '-', '-', 'd', '-'], ['k', '-', 'h', '-', 's', '-', '-', 'h']]).flat()) },
+      { wave: 'triangle', vol: 0.15, vib: 6, notes: bars(
+        ['D5', '.', '.', '.', 'Eb5', '.', 'D5', '.'], ['C5', '.', '.', '.', 'A4', '.', '.', '.'],
+        ['Bb4', '.', '.', '.', 'A4', '.', 'G4', '.'], ['A4', '.', '.', '.', '-', '-', '-', '-'],
+        ['D5', '.', 'F5', '.', 'Eb5', '.', 'D5', '.'], ['C5', '.', 'D5', '.', 'Bb4', '.', '.', '.'],
+        ['A4', '.', 'G4', '.', 'F4', '.', 'G4', '.'], ['A4', '.', '.', '.', '.', '.', '.', '-']) },
+      { wave: 'square', vol: 0.035, vib: 3, notes: bars(
+        ...['D4', 'F4', 'D4', 'C#4', 'D4', 'D4', 'Bb3', 'A3'].map((n) => [n, '.', '.', '.', '.', '.', '.', '.'])) },
+      { wave: 'triangle', vol: 0.26, notes: bars(
+        ['D2', '.', '.', '.', '.', '.', '.', '.'], ['D2', '.', '.', '.', 'A1', '.', '.', '.'],
+        ['G1', '.', '.', '.', '.', '.', '.', '.'], ['A1', '.', '.', '.', '.', '.', '.', '.'],
+        ['D2', '.', '.', '.', '.', '.', '.', '.'], ['Bb1', '.', '.', '.', '.', '.', '.', '.'],
+        ['G1', '.', '.', '.', 'A1', '.', '.', '.'], ['D2', '.', '.', '.', 'A1', '.', '.', '.']) },
+      { drum: true, vol: 0.7, notes: bars(...Array(4).fill([['k', '-', '-', '-', 'd', '-', 'h', '-'], ['k', '-', '-', 'h', 's', '-', '-', 'd']]).flat()) },
+    ],
+  },
+  bossTroll: {
+    // El'Matho: schwer und stampfend, mit Trommeln
+    label: "Bosskampf: El'Matho", bpm: 132,
+    parts: [
+      { wave: 'square', vol: 0.08, notes: bars(
+        ['E5', '-', 'E5', 'F5', 'G5', '.', 'F5', 'E5'], ['D5', '-', 'D5', 'E5', 'F5', '.', 'E5', 'D5'],
+        ['E5', '-', 'E5', 'F5', 'G5', '.', 'Bb5', 'A5'], ['G5', '.', 'F5', '.', 'E5', '.', '.', '.']) },
+      { wave: 'sawtooth', vol: 0.08, notes: bars(
+        ['E2', 'E2', '-', 'E2', 'E2', '-', 'E2', 'F2'], ['D2', 'D2', '-', 'D2', 'D2', '-', 'D2', 'E2'],
+        ['E2', 'E2', '-', 'E2', 'E2', '-', 'E2', 'F2'], ['C2', 'C2', '-', 'C2', 'B1', '-', 'B1', 'B1']) },
+      { drum: true, vol: 1, notes: bars(...Array(3).fill(['k', '-', 'k', 's', 'k', 't', 's', 't']), ['k', 't', 't', 's', 't', 't', 's', 's']) },
+    ],
+  },
+  palace: {
+    // Ebene 3: höfisch und unheimlich, wie ein Cembalo in einem leeren Thronsaal
+    label: 'Ebene 3: Palast der Seelen', bpm: 96,
+    parts: [
+      { wave: 'square', vol: 0.05, notes: bars(
+        ['A4', 'C5', 'E5', 'A5', 'E5', 'C5', 'A4', 'C5'], ['G#4', 'B4', 'E5', 'G#5', 'E5', 'B4', 'G#4', 'B4'],
+        ['F4', 'A4', 'C5', 'F5', 'C5', 'A4', 'F4', 'A4'], ['E4', 'G#4', 'B4', 'E5', 'B4', 'G#4', 'D5', 'B4'],
+        ['A4', 'C5', 'E5', 'A5', 'E5', 'C5', 'A4', 'C5'], ['D4', 'F4', 'A4', 'D5', 'A4', 'F4', 'D4', 'F4'],
+        ['E4', 'G#4', 'B4', 'E5', 'B4', 'G#4', 'B4', 'D5'], ['A4', 'E4', 'A4', 'C5', 'E5', '.', '.', '-']) },
+      { wave: 'triangle', vol: 0.13, vib: 5, notes: bars(
+        ['E5', '.', '.', '.', 'A5', '.', 'G#5', '.'], ['B5', '.', '.', '.', '.', '.', '-', '-'],
+        ['C6', '.', 'B5', '.', 'A5', '.', 'F5', '.'], ['G#5', '.', '.', '.', '-', '-', '-', '-'],
+        ['E5', '.', '.', '.', 'A5', '.', 'B5', '.'], ['C6', '.', '.', '.', 'D6', '.', 'C6', '.'],
+        ['B5', '.', 'A5', '.', 'G#5', '.', 'B5', '.'], ['A5', '.', '.', '.', '.', '.', '-', '-']) },
+      { wave: 'sine', vol: 0.2, notes: bars(
+        ...['A2', 'E2', 'F2', 'E2', 'A2', 'D2', 'E2', 'A2'].map((n) => [n, '.', '.', '.', '.', '.', '.', '.'])) },
+      { drum: true, vol: 0.5, notes: bars(...Array(8).fill(['k', '-', 'h', '-', 's', '-', 'h', '-'])) },
+    ],
+  },
+  bossKarthul: {
+    // Karthul: episch, schnell, mit treibendem Bass
+    label: 'Bosskampf: Karthul', bpm: 160,
+    parts: [
+      { wave: 'square', vol: 0.09, notes: bars(
+        ['D5', '.', 'A5', '.', 'F5', '.', 'D5', 'E5'], ['F5', '.', 'G5', '.', 'A5', '.', '.', '.'],
+        ['Bb5', '.', 'A5', '.', 'G5', '.', 'F5', 'E5'], ['A5', '.', '.', '.', 'C#5', '.', '.', '.'],
+        ['D5', '.', 'A5', '.', 'F5', '.', 'D5', 'E5'], ['F5', '.', 'G5', '.', 'A5', '.', 'D6', '.'],
+        ['C6', '.', 'Bb5', '.', 'A5', '.', 'G5', '.'], ['A5', '.', 'C#6', '.', 'D6', '.', '.', '.']) },
+      { wave: 'triangle', vol: 0.12, notes: bars(
+        ...['D4', 'F4', 'G4', 'A4', 'D4', 'F4', 'Bb4', 'A4'].map((n) => [n, '.', '.', '.', '.', '.', '.', '.'])) },
+      { wave: 'sawtooth', vol: 0.075, notes: bars(
+        ...[['D2', 'D3'], ['D2', 'D3'], ['Bb1', 'Bb2'], ['A1', 'A2'], ['D2', 'D3'], ['F2', 'F3'], ['Bb1', 'Bb2'], ['A1', 'A2']].map(([a, b]) => [a, b, a, b, a, b, a, b])) },
+      { drum: true, vol: 0.95, notes: bars(...Array(7).fill(['k', 'h', 's', 'h', 'k', 'k', 's', 'h']), ['s', 's', 't', 't', 'k', 's', 's', 's']) },
     ],
   },
   boss: {

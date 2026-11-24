@@ -1,5 +1,5 @@
 // Spielschleife, Kamera, Effekte und Spielzustände (Auswahl, Spielen, Tod)
-const GAME_VERSION = '0.8.0';
+const GAME_VERSION = '0.9.0';
 const W = 384;
 const H = 216;
 const WORLD = 1600;
@@ -34,6 +34,9 @@ const game = {
   stageBoss: null,
   pillars: [],
   pillarT: 0,
+  props: [], // Palast: Kisten und Rüstungen
+  footprints: [], // Fußspuren des unsichtbaren Schurken
+  minions: [], // Diener des Ebenen-Bosses (Heilerin, Schurke)
   clearT: 0,
   autoFire: loadAutoFire(),
   zones: [], // Feuerzonen (Magier-Ult)
@@ -110,6 +113,9 @@ const game = {
     this.groundFx = [];
     this.meteors = [];
     this.hazards = [];
+    this.props = [];
+    this.footprints = [];
+    this.minions = [];
     this.runGold = 0;
     this.swarmT = SWARM.firstAfter;
     this.pillarT = 3;
@@ -122,6 +128,7 @@ const game = {
     p.hp = p.maxHp;
     this.cam.x = p.x - W / 2;
     this.cam.y = p.y - H / 2;
+    setupPalace(this); // Palast: feste Säulen, Rüstungen, Kisten
     for (let i = 0; i < 4; i++) spawnEnemy(this);
     this.state = 'play';
   },
@@ -159,6 +166,7 @@ const game = {
       const t = this.stageBoss.fightTime;
       if (!this.run.fastestBoss || t < this.run.fastestBoss) this.run.fastestBoss = t;
     }
+    if (this.stageBoss && this.stageBoss.type === ENEMY_TYPES.karthul) this.run.karthul++; // Erfolg Ebene 3
     // Boss der letzten Ebene besiegt: gewonnen!
     if (!STAGES[this.stage + 1]) {
       this.state = 'victory';
@@ -352,7 +360,7 @@ const game = {
   },
 
   hitEnemy(e, dmg, angle, knockback) {
-    if (e.dead) return;
+    if (e.dead || e.introT > 0) return; // Boss-Auftritt: noch unverwundbar
     if (this.run) { // Statistik: Schaden und höchster Einzeltreffer
       this.run.dmgDealt += Math.max(0, Math.min(dmg, e.hp));
       this.run.maxHit = Math.max(this.run.maxHit, dmg);
@@ -539,6 +547,7 @@ const game = {
       updateGroundFx(dt, this);
       updateHazards(dt, this);
       updateSwarm(dt, this);
+      updatePalace(dt, this);
       this.updatePhase(dt);
     }
 
@@ -559,7 +568,7 @@ const game = {
     }
     updateProjectiles(dt, this);
     const p = this.player;
-    this.enemies = this.enemies.filter((e) => !e.dead && (e.boss || Math.hypot(e.x - p.x, e.y - p.y) < 450));
+    this.enemies = this.enemies.filter((e) => !e.dead && (e.boss || e.keep || Math.hypot(e.x - p.x, e.y - p.y) < 450));
 
     for (const pt of this.particles) {
       pt.x += pt.vx * dt;
@@ -585,7 +594,7 @@ const game = {
   updateMusic() {
     let want = null;
     if (this.state === 'menu' || this.state === 'select' || this.state === 'ability' || MENU_TABS.includes(this.state)) want = 'menu';
-    else if (this.state === 'play') want = this.phase === 'boss' ? 'boss' : this.stageDef.music;
+    else if (this.state === 'play') want = this.phase === 'boss' ? this.stageDef.bossMusic || 'boss' : this.stageDef.music;
     if (want) Sound.playMusic(want);
     // in Pause, Stat-Wahl und Dev-Menü leiser
     Sound.setDuck(this.state === 'play' && (this.paused || this.choice || this.devMenu) ? 0.35 : 1);
@@ -635,19 +644,22 @@ const game = {
     };
     if (this.stageDef.ground === 'stone') drawStoneGround(ctx, cam);
     else if (this.stageDef.ground === 'crypt') drawCryptGround(ctx, cam);
+    else if (this.stageDef.ground === 'palace') drawPalaceGround(ctx, cam);
     else drawGround(ctx, cam);
     drawPillarZones(ctx, cam, this);
+    drawFootprints(ctx, cam, this);
     drawFireZones(ctx, cam, this);
     drawGroundFx(ctx, cam, this);
     drawPickups(ctx, cam, this);
 
-    const actors = [...this.enemies, ...this.pillars];
+    const actors = [...this.enemies, ...this.pillars, ...this.props];
     if (this.state !== 'dead') actors.push(this.player);
     actors.sort((a, b) => a.y - b.y);
     for (const a of actors) a.draw(ctx, cam, this);
 
     drawProjectiles(ctx, cam, this);
     drawHazards(ctx, cam, this);
+    drawVeil(ctx, this); // Karthul in Wut: der Abendschleier verdunkelt alles
 
     for (const pt of this.particles) {
       ctx.globalAlpha = Math.min(1, pt.life / pt.max + 0.2);

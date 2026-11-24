@@ -114,6 +114,8 @@ function drawProjectiles(ctx, cam, game) {
       ctx.fillRect(sx - 2, sy - 2, 5, 5);
       ctx.fillStyle = '#ffffff';
       ctx.fillRect(sx - 1, sy - 1, 2, 2);
+    } else if (p.sprite) {
+      drawRotated(ctx, SPR[p.sprite], sx, sy, Math.atan2(p.vy, p.vx), -3); // Goblin-Pfeile, Schattenklingen
     } else if (p.kind === 'arrow') {
       drawRotated(ctx, p.freeze ? SPR.iceArrow : p.gold ? SKIN_SPR.goldArrow : SPR.arrow, sx, sy, Math.atan2(p.vy, p.vx), -4);
     } else if (p.kind === 'tornado') {

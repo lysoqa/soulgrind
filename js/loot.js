@@ -4,7 +4,7 @@
 const LOOT = {
   goldChance: 0.2, // Chance auf 1 Gold pro Gegner
   goldMiniBoss: 10, // Mini-Boss lässt so viel Gold fallen
-  goldStageBoss: { volghard: 25, elmatho: 40 }, // Ebenen-Bosse
+  goldStageBoss: { volghard: 25, elmatho: 40, karthul: 60 }, // Ebenen-Bosse
   goldLife: 30, // Sekunden, bis eine Münze verschwindet
   heartChance: 0.08, // Chance auf ein Herz pro Gegner
   heartHeal: 20,
@@ -58,6 +58,7 @@ function dropLoot(game, e) {
   let gold = 0;
   if (e.bossBar) gold = Math.round((LOOT.goldStageBoss[Object.keys(ENEMY_TYPES).find((k) => ENEMY_TYPES[k] === e.type)] || 25) * find);
   else if (e.boss) gold = Math.round(LOOT.goldMiniBoss * find);
+  else if (e.type.gold) gold = Math.round(e.type.gold * find);
   else if (Math.random() < Math.min(1, LOOT.goldChance * find)) gold = 1;
   for (let i = 0; i < gold; i++) spawnPickup(game, 'gold', e.x, e.y, gold > 1);
   if (!e.boss && Math.random() < LOOT.heartChance) spawnPickup(game, 'heart', e.x, e.y, false);
